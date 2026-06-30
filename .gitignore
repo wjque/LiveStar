@@ -1,0 +1,30 @@
+# 私有数据目录
+data/
+*/data/
+
+# Python 编译缓存
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyd
+.Python
+*.pytest_cache
+
+# Python 虚拟环境
+venv/
+.venv/
+env/
+.env
+
+# 打包/编译产出
+dist/
+build/
+*.egg-info/
+*.egg
+
+# VSCode 配置
+.vscode/
+*.code-workspace
+
+# Zed编辑器配置
+.zed/
