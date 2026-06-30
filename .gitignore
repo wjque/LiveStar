@@ -1,6 +1,8 @@
 # 私有数据目录
 data/
 */data/
+output/
+*/output/
 
 # Python 编译缓存
 __pycache__/
