@@ -1,0 +1,36 @@
+{
+  "overall": {
+    "macro_f1": 0.5833,
+    "gmean_f1": 0.5774,
+    "interrupt_precision": 0.6667,
+    "interrupt_recall": 0.4,
+    "interrupt_f1": 0.5,
+    "silent_precision": 0.5714,
+    "silent_recall": 0.8,
+    "silent_f1": 0.6667,
+    "tp": 2,
+    "fp": 1,
+    "tn": 4,
+    "fn": 3,
+    "support": 10
+  },
+  "per_task": {
+    "Decorating a notebook cover with stickers": {
+      "macro_f1": 0.5833,
+      "gmean_f1": 0.5774,
+      "interrupt_precision": 0.6667,
+      "interrupt_recall": 0.4,
+      "interrupt_f1": 0.5,
+      "silent_precision": 0.5714,
+      "silent_recall": 0.8,
+      "silent_f1": 0.6667,
+      "tp": 2,
+      "fp": 1,
+      "tn": 4,
+      "fn": 3,
+      "support": 10
+    }
+  },
+  "total_sessions": 1,
+  "skipped_chunks": 0
+}

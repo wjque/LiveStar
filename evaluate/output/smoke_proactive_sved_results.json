@@ -1,0 +1,86 @@
+{
+  "overall": {
+    "macro_f1": 0.697,
+    "gmean_f1": 0.6963,
+    "interrupt_precision": 0.75,
+    "interrupt_recall": 0.6,
+    "interrupt_f1": 0.6667,
+    "silent_precision": 0.6667,
+    "silent_recall": 0.8,
+    "silent_f1": 0.7273,
+    "tp": 3,
+    "fp": 1,
+    "tn": 4,
+    "fn": 2,
+    "support": 10
+  },
+  "per_task": {
+    "Decorating a notebook cover with stickers": {
+      "macro_f1": 0.697,
+      "gmean_f1": 0.6963,
+      "interrupt_precision": 0.75,
+      "interrupt_recall": 0.6,
+      "interrupt_f1": 0.6667,
+      "silent_precision": 0.6667,
+      "silent_recall": 0.8,
+      "silent_f1": 0.7273,
+      "tp": 3,
+      "fp": 1,
+      "tn": 4,
+      "fn": 2,
+      "support": 10
+    }
+  },
+  "total_sessions": 1,
+  "skipped_chunks": 0,
+  "per_row": [
+    {
+      "index": 0,
+      "video_path": "0028bee556249cd3.mp4",
+      "task": "Decorating a notebook cover with stickers",
+      "num_chunks": 10,
+      "tags": [
+        {
+          "gold": "interrupt",
+          "pred": "interrupt"
+        },
+        {
+          "gold": "interrupt",
+          "pred": "interrupt"
+        },
+        {
+          "gold": "silent",
+          "pred": "interrupt"
+        },
+        {
+          "gold": "interrupt",
+          "pred": "silent"
+        },
+        {
+          "gold": "silent",
+          "pred": "silent"
+        },
+        {
+          "gold": "interrupt",
+          "pred": "silent"
+        },
+        {
+          "gold": "silent",
+          "pred": "silent"
+        },
+        {
+          "gold": "silent",
+          "pred": "silent"
+        },
+        {
+          "gold": "interrupt",
+          "pred": "interrupt"
+        },
+        {
+          "gold": "silent",
+          "pred": "silent"
+        }
+      ]
+    }
+  ]
+}
