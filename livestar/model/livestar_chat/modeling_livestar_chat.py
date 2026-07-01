@@ -191,6 +191,45 @@ class InternVLChatModel(PreTrainedModel):
         self.conv_template = get_conv_template(self.template)
         self.system_message = self.conv_template.system_message
 
+    def wrap_llm_lora(self, r=16, lora_alpha=32, lora_dropout=0.05):
+        try:
+            from peft import LoraConfig, TaskType, get_peft_model
+        except ImportError as exc:
+            raise ImportError(
+                "LoRA fine-tuning requires peft. Install the LiveStar requirements first."
+            ) from exc
+
+        lora_config = LoraConfig(
+            r=r,
+            lora_alpha=lora_alpha,
+            target_modules=["wqkv", "wo", "w1", "w2", "w3"],
+            lora_dropout=lora_dropout,
+            bias="none",
+            task_type=TaskType.CAUSAL_LM,
+        )
+        self.language_model = get_peft_model(self.language_model, lora_config)
+        if hasattr(self.language_model, "print_trainable_parameters"):
+            self.language_model.print_trainable_parameters()
+
+    def wrap_backbone_lora(self, r=8, lora_alpha=16, lora_dropout=0.05):
+        try:
+            from peft import LoraConfig, get_peft_model
+        except ImportError as exc:
+            raise ImportError(
+                "Vision LoRA fine-tuning requires peft. Install the LiveStar requirements first."
+            ) from exc
+
+        lora_config = LoraConfig(
+            r=r,
+            lora_alpha=lora_alpha,
+            target_modules=["qkv", "proj", "fc1", "fc2"],
+            lora_dropout=lora_dropout,
+            bias="none",
+        )
+        self.vision_model = get_peft_model(self.vision_model, lora_config)
+        if hasattr(self.vision_model, "print_trainable_parameters"):
+            self.vision_model.print_trainable_parameters()
+
     def merge_tokens(self, x, target_num_token):
         r"""
         x = torch.randn(10, 2560, c)

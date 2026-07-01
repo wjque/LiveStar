@@ -63,6 +63,53 @@ from transformers.trainer_utils import get_last_checkpoint
 from transformers.utils.logging import (enable_default_handler,
                                         enable_explicit_format, set_verbosity)
 
+
+def patch_accelerate_dataloader_args():
+    """Keep Transformers 4.37 Trainer compatible with newer Accelerate.
+
+    Transformers 4.37 passes dataloader kwargs such as ``dispatch_batches``
+    directly to ``Accelerator``. Accelerate 1.x moved them under
+    ``DataLoaderConfiguration``. This shim preserves the old Trainer call site
+    without changing training behavior.
+    """
+    try:
+        import inspect
+        from accelerate import Accelerator
+        from accelerate.utils import DataLoaderConfiguration
+    except Exception:
+        return
+
+    signature = inspect.signature(Accelerator.__init__)
+    if "dispatch_batches" in signature.parameters:
+        return
+
+    original_init = Accelerator.__init__
+
+    def compatible_init(self, *args, **kwargs):
+        dataloader_keys = {
+            "split_batches",
+            "dispatch_batches",
+            "even_batches",
+            "use_seedable_sampler",
+            "data_seed",
+        }
+        dataloader_kwargs = {
+            key: kwargs.pop(key) for key in list(kwargs.keys()) if key in dataloader_keys
+        }
+        if dataloader_kwargs and kwargs.get("dataloader_config") is None:
+            kwargs["dataloader_config"] = DataLoaderConfiguration(**dataloader_kwargs)
+        return original_init(self, *args, **kwargs)
+
+    Accelerator.__init__ = compatible_init
+
+
+def set_peft_base_model_path(module, base_model_name_or_path: str) -> None:
+    if not hasattr(module, "peft_config"):
+        return
+    for peft_config in module.peft_config.values():
+        peft_config.base_model_name_or_path = base_model_name_or_path
+
+
 # Try to import petrel_client for image loading, fallback to PIL if unavailable
 try:
     from petrel_client.client import Client
@@ -908,6 +955,8 @@ def len2weight(x, loss_reduction):
 
 
 def main():
+    patch_accelerate_dataloader_args()
+
     # Apply necessary patches for the transformers library
     replace_llama_rmsnorm_with_fused_rmsnorm()
     replace_train_sampler()
@@ -1117,10 +1166,12 @@ def main():
 
     if model_args.use_backbone_lora:
         model.wrap_backbone_lora(r=model_args.use_backbone_lora, lora_alpha=2 * model_args.use_backbone_lora)
+        set_peft_base_model_path(model.vision_model, model_args.model_name_or_path)
         model.config.use_backbone_lora = model_args.use_backbone_lora
 
     if model_args.use_llm_lora:
         model.wrap_llm_lora(r=model_args.use_llm_lora, lora_alpha=2 * model_args.use_llm_lora)
+        set_peft_base_model_path(model.language_model, model_args.model_name_or_path)
         model.config.use_llm_lora = model_args.use_llm_lora
 
     if model_args.freeze_mlp:
@@ -1172,7 +1223,22 @@ def main():
         # import pdb
         # pdb.set_trace()
         train_result = trainer.train(resume_from_checkpoint=checkpoint)
-        trainer.save_model()  # Saves the tokenizer too for easy upload
+        use_lora = bool(model_args.use_llm_lora or model_args.use_backbone_lora)
+        if use_lora:
+            if dist.get_rank() == 0:
+                os.makedirs(training_args.output_dir, exist_ok=True)
+                if model_args.use_llm_lora and hasattr(model.language_model, 'save_pretrained'):
+                    if model_args.use_backbone_lora:
+                        model.language_model.save_pretrained(os.path.join(training_args.output_dir, 'llm'))
+                    else:
+                        model.language_model.save_pretrained(training_args.output_dir)
+                if model_args.use_backbone_lora and hasattr(model.vision_model, 'save_pretrained'):
+                    if model_args.use_llm_lora:
+                        model.vision_model.save_pretrained(os.path.join(training_args.output_dir, 'vision'))
+                    else:
+                        model.vision_model.save_pretrained(training_args.output_dir)
+        else:
+            trainer.save_model()  # Saves the tokenizer too for easy upload
 
         metrics = train_result.metrics
         try:

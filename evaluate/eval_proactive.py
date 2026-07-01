@@ -16,6 +16,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import time
 from pathlib import Path
 
 import cv2
@@ -46,9 +47,6 @@ SYSTEM_PROMPT = (
     "performing a procedural task. The user has issued a high-level query. "
     "When it is useful to speak, generate one short, timely, actionable instruction "
     "for the user. Speak directly to the user in second person or imperative form. "
-    "Do not narrate what the person is doing, do not mention frames, and do not "
-    "describe the video. Good style: `Place the sticker near the top edge and "
-    "press it flat.` Bad style: `The person is placing a sticker.`"
 )
 
 
@@ -66,6 +64,25 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--output", default=str(DEFAULT_OUTPUT), help="Prediction JSONL output path.")
     parser.add_argument("--eval-output", default=str(DEFAULT_EVAL_OUTPUT), help="Starter-kit results JSON path.")
     parser.add_argument(
+        "--lora-adapter",
+        default="",
+        help=(
+            "Optional PEFT LoRA adapter directory. A directory with adapter_config.json "
+            "is loaded as the LLM adapter. A directory containing llm/ and/or vision/ "
+            "subdirectories loads those adapters respectively."
+        ),
+    )
+    parser.add_argument(
+        "--llm-lora-adapter",
+        default="",
+        help="Optional explicit PEFT LoRA adapter directory for model.language_model.",
+    )
+    parser.add_argument(
+        "--vision-lora-adapter",
+        default="",
+        help="Optional explicit PEFT LoRA adapter directory for model.vision_model.",
+    )
+    parser.add_argument(
         "--eval-python",
         default=sys.executable,
         help=(
@@ -75,6 +92,14 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--max-samples", type=int, default=None, help="Only process the first N sessions.")
     parser.add_argument("--resume", action="store_true", help="Skip already written prediction rows.")
+    parser.add_argument(
+        "--gpu-ids",
+        default="",
+        help=(
+            "Comma-separated GPU IDs for multi-process sample parallelism, e.g. "
+            "`0,1,2,3`. Each worker sees one GPU through CUDA_VISIBLE_DEVICES."
+        ),
+    )
     parser.add_argument("--generate-only", action="store_true", help="Write predictions but skip starter-kit scoring.")
     parser.add_argument("--eval-only", action="store_true", help="Skip inference and score an existing prediction file.")
     parser.add_argument("--frames-per-interval", type=int, default=2, help="Frames sampled per chunk interval.")
@@ -94,12 +119,19 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--decode-factor", type=float, default=1.04, help="SVeD threshold multiplier.")
     parser.add_argument("--check-len", type=int, default=1000, help="Max chars from the last output used for PPL checks.")
     parser.add_argument("--ppl-runs", type=int, default=1, help="Repeat PPL checks and average the result.")
+    parser.add_argument("--shard-index", type=int, default=0, help=argparse.SUPPRESS)
+    parser.add_argument("--num-shards", type=int, default=1, help=argparse.SUPPRESS)
     return parser.parse_args()
 
 
 def load_jsonl(path: Path) -> list[dict[str, object]]:
     with path.open("r", encoding="utf-8") as f:
         return [json.loads(line) for line in f if line.strip()]
+
+
+def load_json(path: Path) -> dict[str, object]:
+    with path.open("r", encoding="utf-8") as f:
+        return json.load(f)
 
 
 def dump_jsonl(path: Path, rows: list[dict[str, object]]) -> None:
@@ -112,6 +144,62 @@ def dump_jsonl(path: Path, rows: list[dict[str, object]]) -> None:
 def require_file(path: Path) -> None:
     if not path.exists():
         raise FileNotFoundError(f"Required path does not exist: {path}")
+
+
+def has_adapter_config(path: Path) -> bool:
+    return (path / "adapter_config.json").is_file()
+
+
+def resolve_lora_adapters(args: argparse.Namespace) -> dict[str, Path]:
+    adapters: dict[str, Path] = {}
+    if args.lora_adapter:
+        root = Path(args.lora_adapter).expanduser()
+        llm_dir = root / "llm"
+        vision_dir = root / "vision"
+        if has_adapter_config(llm_dir):
+            adapters["llm"] = llm_dir
+        elif has_adapter_config(root):
+            adapters["llm"] = root
+        if has_adapter_config(vision_dir):
+            adapters["vision"] = vision_dir
+        if not adapters:
+            raise FileNotFoundError(
+                f"No adapter_config.json found in {root}, {llm_dir}, or {vision_dir}."
+            )
+    if args.llm_lora_adapter:
+        adapters["llm"] = Path(args.llm_lora_adapter).expanduser()
+    if args.vision_lora_adapter:
+        adapters["vision"] = Path(args.vision_lora_adapter).expanduser()
+    for name, path in adapters.items():
+        require_file(path / "adapter_config.json")
+    return adapters
+
+
+def load_lora_adapters(model, args: argparse.Namespace) -> dict[str, str]:
+    adapters = resolve_lora_adapters(args)
+    if not adapters:
+        return {}
+    try:
+        from peft import PeftModel
+    except ImportError as exc:
+        raise ImportError("Loading LoRA adapters requires peft in the active environment.") from exc
+
+    loaded: dict[str, str] = {}
+    if "llm" in adapters:
+        model.language_model = PeftModel.from_pretrained(
+            model.language_model,
+            str(adapters["llm"]),
+            is_trainable=False,
+        )
+        loaded["llm"] = str(adapters["llm"].resolve())
+    if "vision" in adapters:
+        model.vision_model = PeftModel.from_pretrained(
+            model.vision_model,
+            str(adapters["vision"]),
+            is_trainable=False,
+        )
+        loaded["vision"] = str(adapters["vision"].resolve())
+    return loaded
 
 
 def make_runtime_model_dir(model_code_dir: Path, weights_dir: Path) -> tuple[tempfile.TemporaryDirectory, Path]:
@@ -267,6 +355,10 @@ def normalize_interrupt(raw: str) -> str:
     return "$interrupt$" + text
 
 
+def count_chunks(rows: list[dict[str, object]]) -> int:
+    return sum(len(row.get("answers", [])) for row in rows)
+
+
 def compute_avg_perplexity(
     model,
     tokenizer,
@@ -308,6 +400,148 @@ def already_completed_rows(output_path: Path, rows: list[dict[str, object]]) -> 
     return count
 
 
+def parse_gpu_ids(gpu_ids: str) -> list[str]:
+    text = gpu_ids.strip()
+    if not text:
+        return []
+    if text.lower() == "all":
+        if not torch.cuda.is_available():
+            return []
+        return [str(i) for i in range(torch.cuda.device_count())]
+    return [part.strip() for part in text.split(",") if part.strip()]
+
+
+def build_parallel_worker_command(
+    args: argparse.Namespace,
+    annotations: Path,
+    output_path: Path,
+    shard_index: int,
+    num_shards: int,
+) -> list[str]:
+    eval_output = output_path.with_suffix(".results.json")
+    return [
+        sys.executable,
+        str(Path(__file__).resolve()),
+        "--annotations",
+        str(annotations),
+        "--video-folder",
+        str(args.video_folder),
+        "--weights-dir",
+        str(args.weights_dir),
+        "--model-code-dir",
+        str(args.model_code_dir),
+        "--starter-kit",
+        str(args.starter_kit),
+        "--output",
+        str(output_path),
+        "--eval-output",
+        str(eval_output),
+        "--lora-adapter",
+        str(args.lora_adapter),
+        "--llm-lora-adapter",
+        str(args.llm_lora_adapter),
+        "--vision-lora-adapter",
+        str(args.vision_lora_adapter),
+        "--eval-python",
+        str(args.eval_python),
+        "--frames-per-interval",
+        str(args.frames_per_interval),
+        "--max-frames",
+        str(args.max_frames),
+        "--max-history-turns",
+        str(args.max_history_turns),
+        "--max-new-tokens",
+        str(args.max_new_tokens),
+        "--input-size",
+        str(args.input_size),
+        "--decode-factor",
+        str(args.decode_factor),
+        "--check-len",
+        str(args.check_len),
+        "--ppl-runs",
+        str(args.ppl_runs),
+        "--generate-only",
+        "--shard-index",
+        str(shard_index),
+        "--num-shards",
+        str(num_shards),
+    ]
+
+
+def generate_predictions_parallel(args: argparse.Namespace, rows: list[dict[str, object]]) -> None:
+    gpu_ids = parse_gpu_ids(args.gpu_ids)
+    if not gpu_ids:
+        generate_predictions(args, rows)
+        return
+
+    output_path = Path(args.output)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+
+    start_idx = already_completed_rows(output_path, rows) if args.resume else 0
+    completed_predictions = load_jsonl(output_path)[:start_idx] if start_idx else []
+    pending_rows = rows[start_idx:]
+    if not pending_rows:
+        print("All requested rows already exist in the prediction file; skipping generation.")
+        return
+
+    worker_gpu_ids = gpu_ids[: min(len(gpu_ids), len(pending_rows))]
+    with tempfile.TemporaryDirectory(prefix="livestar_parallel_") as tmp_name:
+        tmp_dir = Path(tmp_name)
+        worker_annotations = tmp_dir / "rows.jsonl"
+        dump_jsonl(worker_annotations, pending_rows)
+
+        processes: list[tuple[int, str, Path, subprocess.Popen]] = []
+        for rank, gpu_id in enumerate(worker_gpu_ids):
+            worker_output = tmp_dir / f"predictions_rank{rank}.jsonl"
+            cmd = build_parallel_worker_command(
+                args,
+                worker_annotations,
+                worker_output,
+                shard_index=rank,
+                num_shards=len(worker_gpu_ids),
+            )
+            env = os.environ.copy()
+            env["CUDA_VISIBLE_DEVICES"] = gpu_id
+            print(f"[worker {rank}] GPU {gpu_id}: {' '.join(shlex.quote(part) for part in cmd)}")
+            process = subprocess.Popen(cmd, cwd=str(Path.cwd()), env=env)
+            processes.append((rank, gpu_id, worker_output, process))
+
+        failures: list[str] = []
+        for rank, gpu_id, _, process in processes:
+            return_code = process.wait()
+            if return_code != 0:
+                failures.append(f"worker {rank} on GPU {gpu_id} exited with code {return_code}")
+        if failures:
+            raise RuntimeError("; ".join(failures))
+
+        predictions_by_rank: dict[int, list[dict[str, object]]] = {}
+        for rank, _, worker_output, _ in processes:
+            require_file(worker_output)
+            predictions = load_jsonl(worker_output)
+            expected_rows = pending_rows[rank :: len(worker_gpu_ids)]
+            if len(predictions) != len(expected_rows):
+                raise RuntimeError(
+                    f"Worker {rank} wrote {len(predictions)} rows, expected {len(expected_rows)}."
+                )
+            for pred, row in zip(predictions, expected_rows):
+                if pred.get("video_path") != row.get("video_path"):
+                    raise RuntimeError(
+                        f"Worker {rank} output order mismatch: expected {row.get('video_path')}, "
+                        f"got {pred.get('video_path')}"
+                    )
+            predictions_by_rank[rank] = predictions
+
+        merged_pending: list[dict[str, object]] = []
+        for local_idx, _ in enumerate(pending_rows):
+            rank = local_idx % len(worker_gpu_ids)
+            rank_pos = local_idx // len(worker_gpu_ids)
+            merged_pending.append(predictions_by_rank[rank][rank_pos])
+
+        merged = completed_predictions + merged_pending
+        dump_jsonl(output_path, merged)
+        print(f"Merged {len(merged)} prediction rows into {output_path}")
+
+
 def generate_predictions(args: argparse.Namespace, rows: list[dict[str, object]]) -> None:
     output_path = Path(args.output)
     output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -321,6 +555,9 @@ def generate_predictions(args: argparse.Namespace, rows: list[dict[str, object]]
         print(f"Loading LiveStar from temporary model dir: {runtime_model_dir}")
         tokenizer = AutoTokenizer.from_pretrained(runtime_model_dir, trust_remote_code=True)
         model = AutoModel.from_pretrained(runtime_model_dir, trust_remote_code=True).half().cuda().to(torch.bfloat16)
+        loaded_adapters = load_lora_adapters(model, args)
+        if loaded_adapters:
+            print(f"Loaded LoRA adapters: {loaded_adapters}")
         model.eval()
 
         generation_config = {
@@ -459,12 +696,13 @@ def maybe_write_subset_annotations(args: argparse.Namespace, rows: list[dict[str
     return subset_path.resolve()
 
 
-def run_starter_kit_eval(args: argparse.Namespace, rows: list[dict[str, object]]) -> None:
+def run_starter_kit_eval(args: argparse.Namespace, rows: list[dict[str, object]]) -> dict[str, object]:
     starter_kit = Path(args.starter_kit).resolve()
     eval_script = starter_kit / "run_evaluation.py"
     require_file(eval_script)
     require_file(Path(args.output))
     golden_path = maybe_write_subset_annotations(args, rows)
+    eval_output = Path(args.eval_output).resolve()
 
     cmd = [
         *shlex.split(args.eval_python),
@@ -477,31 +715,94 @@ def run_starter_kit_eval(args: argparse.Namespace, rows: list[dict[str, object]]
         "--predictions",
         str(Path(args.output).resolve()),
         "--eval-output",
-        str(Path(args.eval_output).resolve()),
+        str(eval_output),
     ]
     print("Running starter-kit evaluation:")
     print(" ".join(shlex.quote(part) for part in cmd))
     subprocess.run(cmd, cwd=str(starter_kit), check=True)
+    require_file(eval_output)
+    return load_json(eval_output)
+
+
+def write_run_log(
+    args: argparse.Namespace,
+    rows: list[dict[str, object]],
+    started_at: float,
+    generation_seconds: float | None,
+    scoring_seconds: float | None,
+    results: dict[str, object] | None,
+) -> None:
+    output_path = Path(args.output).resolve()
+    eval_output_path = Path(args.eval_output).resolve()
+    log_path = output_path.parent / "log.jsonl"
+    log_path.parent.mkdir(parents=True, exist_ok=True)
+    now = time.time()
+    log_entry = {
+        "timestamp": time.strftime("%Y-%m-%dT%H:%M:%S%z", time.localtime(now)),
+        "samples": len(rows),
+        "chunks": count_chunks(rows),
+        "elapsed_seconds": round(now - started_at, 3),
+        "generation_seconds": round(generation_seconds, 3) if generation_seconds is not None else None,
+        "scoring_seconds": round(scoring_seconds, 3) if scoring_seconds is not None else None,
+        "overall_metrics": results.get("overall") if results else None,
+        "predictions_path": str(output_path),
+        "eval_output_path": str(eval_output_path) if eval_output_path.exists() else None,
+        "weights_dir": str(Path(args.weights_dir).resolve()),
+        "model_code_dir": str(Path(args.model_code_dir).resolve()),
+        "lora_adapter": str(Path(args.lora_adapter).resolve()) if args.lora_adapter else "",
+        "llm_lora_adapter": str(Path(args.llm_lora_adapter).resolve()) if args.llm_lora_adapter else "",
+        "vision_lora_adapter": str(Path(args.vision_lora_adapter).resolve()) if args.vision_lora_adapter else "",
+        "max_samples": args.max_samples,
+        "frames_per_interval": args.frames_per_interval,
+        "max_frames": args.max_frames,
+        "max_history_turns": args.max_history_turns,
+        "max_new_tokens": args.max_new_tokens,
+        "decode_factor": args.decode_factor,
+        "ppl_runs": args.ppl_runs,
+        "generate_only": args.generate_only,
+        "eval_only": args.eval_only,
+        "gpu_ids": args.gpu_ids,
+    }
+    with log_path.open("a", encoding="utf-8") as f:
+        f.write(json.dumps(log_entry, ensure_ascii=False) + "\n")
+    print(f"Run log written to {log_path}")
 
 
 def main() -> None:
+    started_at = time.time()
     args = parse_args()
     annotations = Path(args.annotations)
     require_file(annotations)
     rows = load_jsonl(annotations)
     if args.max_samples is not None:
         rows = rows[: args.max_samples]
+    if args.num_shards < 1:
+        raise ValueError("--num-shards must be >= 1")
+    if not 0 <= args.shard_index < args.num_shards:
+        raise ValueError("--shard-index must be in [0, num_shards)")
+    if args.num_shards > 1:
+        rows = rows[args.shard_index :: args.num_shards]
     if not rows:
         raise RuntimeError("No evaluation rows loaded.")
 
     if args.eval_only and args.generate_only:
         raise ValueError("--eval-only and --generate-only cannot be used together.")
 
+    generation_seconds: float | None = None
+    scoring_seconds: float | None = None
+    results: dict[str, object] | None = None
+
     if not args.eval_only:
-        generate_predictions(args, rows)
+        generation_started = time.time()
+        generate_predictions_parallel(args, rows)
+        generation_seconds = time.time() - generation_started
 
     if not args.generate_only:
-        run_starter_kit_eval(args, rows)
+        scoring_started = time.time()
+        results = run_starter_kit_eval(args, rows)
+        scoring_seconds = time.time() - scoring_started
+
+    write_run_log(args, rows, started_at, generation_seconds, scoring_seconds, results)
 
 
 if __name__ == "__main__":
