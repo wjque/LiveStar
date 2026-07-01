@@ -29,6 +29,8 @@ from transformers import AutoModel, AutoTokenizer
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
 DEFAULT_DATA_ROOT = Path("/data1/wearable_ai_challenge_data")
 DEFAULT_ANNOTATIONS = (
     DEFAULT_DATA_ROOT
@@ -48,6 +50,20 @@ SYSTEM_PROMPT = (
     "When it is useful to speak, generate one short, timely, actionable instruction "
     "for the user. Speak directly to the user in second person or imperative form. "
 )
+GATE_SYSTEM_PROMPT = (
+    "You are a proactive AI assistant watching a first-person video of the user "
+    "performing a procedural task. Decide whether it is useful to speak at the "
+    "current moment. If speaking is useful, provide one short, timely, actionable "
+    "instruction. If not, stay silent."
+)
+GATE_DECISION_INSTRUCTION = (
+    "Decide whether it is useful to speak at the current moment. "
+    "If speaking is useful, provide one short, timely, actionable instruction. "
+    "If no timely help is needed, do not produce an instruction."
+)
+IMG_START_TOKEN = "<img>"
+IMG_END_TOKEN = "</img>"
+IMG_CONTEXT_TOKEN = "<IMG_CONTEXT>"
 
 
 def parse_args() -> argparse.Namespace:
@@ -63,6 +79,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--starter-kit", default=str(DEFAULT_STARTER_KIT), help="Starter-kit directory.")
     parser.add_argument("--output", default=str(DEFAULT_OUTPUT), help="Prediction JSONL output path.")
     parser.add_argument("--eval-output", default=str(DEFAULT_EVAL_OUTPUT), help="Starter-kit results JSON path.")
+    parser.add_argument(
+        "--decision-mode",
+        choices=("sved", "gate"),
+        default="sved",
+        help="Use original SVeD/PPL triggering or the fine-tuned gate head for silent/interrupt decisions.",
+    )
     parser.add_argument(
         "--lora-adapter",
         default="",
@@ -81,6 +103,25 @@ def parse_args() -> argparse.Namespace:
         "--vision-lora-adapter",
         default="",
         help="Optional explicit PEFT LoRA adapter directory for model.vision_model.",
+    )
+    parser.add_argument(
+        "--gate-adapter",
+        default="",
+        help=(
+            "Directory containing gate_head.safetensors or gate_head.pt. "
+            "Defaults to --lora-adapter when --decision-mode=gate."
+        ),
+    )
+    parser.add_argument(
+        "--gate-head",
+        default="",
+        help="Explicit path to gate_head.safetensors or gate_head.pt.",
+    )
+    parser.add_argument(
+        "--gate-threshold",
+        type=float,
+        default=0.5,
+        help="Interrupt when sigmoid(gate_logit) is greater than or equal to this value.",
     )
     parser.add_argument(
         "--eval-python",
@@ -114,6 +155,12 @@ def parse_args() -> argparse.Namespace:
         ),
     )
     parser.add_argument("--max-history-turns", type=int, default=4, help="Prior dialog turns to include. -1 keeps all.")
+    parser.add_argument(
+        "--frame-history-chunks",
+        type=int,
+        default=4,
+        help="Gate mode only: include current chunk plus this many previous chunks of sampled frames.",
+    )
     parser.add_argument("--max-new-tokens", type=int, default=96, help="Max generated tokens per chunk.")
     parser.add_argument("--input-size", type=int, default=448, help="Visual encoder input size.")
     parser.add_argument("--decode-factor", type=float, default=1.04, help="SVeD threshold multiplier.")
@@ -200,6 +247,73 @@ def load_lora_adapters(model, args: argparse.Namespace) -> dict[str, str]:
         )
         loaded["vision"] = str(adapters["vision"].resolve())
     return loaded
+
+
+def resolve_gate_head(args: argparse.Namespace) -> Path | None:
+    if args.gate_head:
+        return Path(args.gate_head).expanduser()
+
+    adapter_dir = Path(args.gate_adapter or args.lora_adapter).expanduser() if (args.gate_adapter or args.lora_adapter) else None
+    if adapter_dir is None:
+        return None
+    for name in ("gate_head.safetensors", "gate_head.pt"):
+        path = adapter_dir / name
+        if path.is_file():
+            return path
+    return None
+
+
+def load_gate_head(model, args: argparse.Namespace) -> str:
+    gate_head = resolve_gate_head(args)
+    if gate_head is None:
+        raise FileNotFoundError(
+            "Gate mode requires gate_head.safetensors or gate_head.pt. "
+            "Pass --gate-adapter, --gate-head, or a --lora-adapter directory containing the gate head."
+        )
+    require_file(gate_head)
+
+    if gate_head.suffix == ".safetensors":
+        try:
+            from safetensors.torch import load_file
+        except ImportError as exc:
+            raise ImportError("Loading gate_head.safetensors requires safetensors.") from exc
+        state_dict = load_file(str(gate_head), device="cpu")
+    else:
+        state_dict = torch.load(gate_head, map_location="cpu")
+    message = model.gate_head.load_state_dict(state_dict, strict=True)
+    print(f"Loaded gate head from {gate_head.resolve()}: {message}")
+    return str(gate_head.resolve())
+
+
+def load_livestar_model(runtime_model_dir: Path, args: argparse.Namespace):
+    tokenizer = AutoTokenizer.from_pretrained(runtime_model_dir, trust_remote_code=True)
+    if args.decision_mode == "gate":
+        from livestar.model.livestar_gate import InternVLChatConfig, InternVLChatModel
+
+        config = InternVLChatConfig.from_pretrained(runtime_model_dir)
+        config.template = "internvl2_5"
+        config.force_image_size = args.input_size
+        model = InternVLChatModel.from_pretrained(
+            runtime_model_dir,
+            torch_dtype=torch.bfloat16,
+            config=config,
+            use_flash_attn=False,
+        ).cuda().to(torch.bfloat16)
+        model.img_context_token_id = tokenizer.convert_tokens_to_ids(IMG_CONTEXT_TOKEN)
+        model.system_message = GATE_SYSTEM_PROMPT
+    else:
+        model = AutoModel.from_pretrained(runtime_model_dir, trust_remote_code=True).half().cuda().to(torch.bfloat16)
+
+    loaded_adapters = load_lora_adapters(model, args)
+    if loaded_adapters:
+        print(f"Loaded LoRA adapters: {loaded_adapters}")
+
+    loaded_gate_head = ""
+    if args.decision_mode == "gate":
+        loaded_gate_head = load_gate_head(model, args)
+
+    model.eval()
+    return tokenizer, model, loaded_adapters, loaded_gate_head
 
 
 def make_runtime_model_dir(model_code_dir: Path, weights_dir: Path) -> tuple[tempfile.TemporaryDirectory, Path]:
@@ -340,6 +454,156 @@ def build_frame_question(start_idx: int, frame_count: int) -> str:
     return "".join(f"Frame-{start_idx + i + 1}: <image>\n" for i in range(frame_count))
 
 
+def strip_decision_prefix(text: str) -> str:
+    text = (text or "").strip()
+    lowered = text.lower()
+    if lowered.startswith("$interrupt$"):
+        return text[len("$interrupt$") :].strip()
+    if lowered.startswith("$silent$"):
+        return ""
+    return text
+
+
+def normalize_gate_history(dialog_at_chunk: list[dict[str, object]], max_history_turns: int) -> list[str]:
+    turns = dialog_at_chunk[1:] if dialog_at_chunk else []
+    if max_history_turns == 0:
+        turns = []
+    elif max_history_turns > 0:
+        turns = turns[-max_history_turns:]
+
+    rendered: list[str] = []
+    for turn in turns:
+        text = strip_decision_prefix(str(turn.get("text", "")).strip())
+        if not text:
+            continue
+        role = str(turn.get("role", "assistant")).strip().lower()
+        rendered.append(f"{role}: {text}")
+    return rendered
+
+
+def build_gate_question(
+    row: dict[str, object],
+    chunk_idx: int,
+    frame_count: int,
+    max_history_turns: int,
+) -> str:
+    query = str(row.get("query", "")).strip()
+    task = str(row.get("task", "")).strip()
+    domain = str(row.get("domain", "")).strip()
+    dialogs = row.get("dialog", [])
+    dialog_at_chunk = dialogs[chunk_idx] if chunk_idx < len(dialogs) else []
+    history = normalize_gate_history(dialog_at_chunk, max_history_turns)
+    frame_prompt = "".join(f"Frame-{i + 1}: <image>\n" for i in range(frame_count))
+
+    parts = [f"User query: {query}"]
+    if task:
+        parts.append(f"Task: {task}")
+    if domain:
+        parts.append(f"Domain: {domain}")
+    if history:
+        parts.append("Recent dialog:\n" + "\n".join(history))
+    parts.append("Observed recent video frames up to the current chunk:\n" + frame_prompt.rstrip())
+    parts.append(GATE_DECISION_INSTRUCTION)
+    return "\n\n".join(parts)
+
+
+def replace_image_placeholders(model, query: str, num_patches_list: list[int]) -> str:
+    for num_patches in num_patches_list:
+        image_tokens = IMG_START_TOKEN + IMG_CONTEXT_TOKEN * model.num_image_token * num_patches + IMG_END_TOKEN
+        img_index = query.find("<image>")
+        if img_index < 0:
+            raise ValueError("Gate prompt/image count mismatch: missing <image> placeholder.")
+        query = query[:img_index] + image_tokens + query[img_index + len("<image>"):]
+    return query
+
+
+def build_gate_prompt(model, question: str, include_assistant: bool) -> str:
+    if "<image>" not in question:
+        question = "<image>\n" + question
+
+    template = model.conv_template.copy()
+    template.system_message = GATE_SYSTEM_PROMPT
+    template.append_message(template.roles[0], question)
+    if include_assistant:
+        template.append_message(template.roles[1], None)
+    return template.get_prompt()
+
+
+def build_gate_inputs(
+    model,
+    tokenizer,
+    question: str,
+    pixel_values: torch.Tensor,
+    num_patches_list: list[int],
+) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
+    query = replace_image_placeholders(
+        model,
+        build_gate_prompt(model, question, include_assistant=False),
+        num_patches_list,
+    )
+
+    model_inputs = tokenizer(query, return_tensors="pt")
+    input_ids = model_inputs["input_ids"].to(model.device)
+    attention_mask = model_inputs["attention_mask"].to(model.device)
+    gate_positions = torch.tensor([max(0, input_ids.shape[1] - 1)], dtype=torch.long, device=model.device)
+    image_flags = torch.tensor(num_patches_list, dtype=torch.long, device=model.device)
+    return input_ids, attention_mask, gate_positions, image_flags
+
+
+def compute_gate_probability(
+    model,
+    tokenizer,
+    pixel_values: torch.Tensor,
+    question: str,
+    num_patches_list: list[int],
+) -> float:
+    input_ids, attention_mask, gate_positions, image_flags = build_gate_inputs(
+        model,
+        tokenizer,
+        question,
+        pixel_values,
+        num_patches_list,
+    )
+    outputs = model(
+        pixel_values=pixel_values,
+        input_ids=input_ids,
+        attention_mask=attention_mask,
+        image_flags=image_flags,
+        gate_positions=gate_positions,
+        return_dict=True,
+    )
+    return float(torch.sigmoid(outputs.gate_logits)[0].detach().cpu())
+
+
+def generate_gate_response(
+    model,
+    tokenizer,
+    pixel_values: torch.Tensor,
+    question: str,
+    generation_config: dict[str, object],
+    num_patches_list: list[int],
+) -> str:
+    query = replace_image_placeholders(
+        model,
+        build_gate_prompt(model, question, include_assistant=True),
+        num_patches_list,
+    )
+    model_inputs = tokenizer(query, return_tensors="pt")
+    input_ids = model_inputs["input_ids"].to(model.device)
+    attention_mask = model_inputs["attention_mask"].to(model.device)
+
+    generation_kwargs = dict(generation_config)
+    generation_kwargs["eos_token_id"] = tokenizer.convert_tokens_to_ids(model.conv_template.sep.strip())
+    generation_output = model.generate(
+        pixel_values=pixel_values,
+        input_ids=input_ids,
+        attention_mask=attention_mask,
+        **generation_kwargs,
+    )
+    response = tokenizer.batch_decode(generation_output, skip_special_tokens=True)[0]
+    return response.split(model.conv_template.sep.strip())[0].strip()
+
+
 def normalize_interrupt(raw: str) -> str:
     text = (raw or "").strip()
     lowered = text.lower()
@@ -436,12 +700,20 @@ def build_parallel_worker_command(
         str(output_path),
         "--eval-output",
         str(eval_output),
+        "--decision-mode",
+        str(args.decision_mode),
         "--lora-adapter",
         str(args.lora_adapter),
         "--llm-lora-adapter",
         str(args.llm_lora_adapter),
         "--vision-lora-adapter",
         str(args.vision_lora_adapter),
+        "--gate-adapter",
+        str(args.gate_adapter),
+        "--gate-head",
+        str(args.gate_head),
+        "--gate-threshold",
+        str(args.gate_threshold),
         "--eval-python",
         str(args.eval_python),
         "--frames-per-interval",
@@ -450,6 +722,8 @@ def build_parallel_worker_command(
         str(args.max_frames),
         "--max-history-turns",
         str(args.max_history_turns),
+        "--frame-history-chunks",
+        str(args.frame_history_chunks),
         "--max-new-tokens",
         str(args.max_new_tokens),
         "--input-size",
@@ -553,12 +827,9 @@ def generate_predictions(args: argparse.Namespace, rows: list[dict[str, object]]
 
     with tmp:
         print(f"Loading LiveStar from temporary model dir: {runtime_model_dir}")
-        tokenizer = AutoTokenizer.from_pretrained(runtime_model_dir, trust_remote_code=True)
-        model = AutoModel.from_pretrained(runtime_model_dir, trust_remote_code=True).half().cuda().to(torch.bfloat16)
-        loaded_adapters = load_lora_adapters(model, args)
-        if loaded_adapters:
-            print(f"Loaded LoRA adapters: {loaded_adapters}")
-        model.eval()
+        tokenizer, model, _, loaded_gate_head = load_livestar_model(runtime_model_dir, args)
+        if loaded_gate_head:
+            print(f"Using gate threshold: {args.gate_threshold}")
 
         generation_config = {
             "do_sample": False,
@@ -588,7 +859,13 @@ def generate_predictions(args: argparse.Namespace, rows: list[dict[str, object]]
                 for chunk_idx, chunk_tensors in enumerate(tensors_by_interval):
                     new_frame_count = len(chunk_tensors)
                     cumulative.extend(chunk_tensors)
-                    if args.max_frames > 0 and len(cumulative) > args.max_frames:
+                    start_chunk = max(0, chunk_idx - args.frame_history_chunks)
+                    gate_window = [
+                        tensor
+                        for interval_tensors in tensors_by_interval[start_chunk : chunk_idx + 1]
+                        for tensor in interval_tensors
+                    ]
+                    if args.decision_mode == "sved" and args.max_frames > 0 and len(cumulative) > args.max_frames:
                         raise RuntimeError(
                             f"{row['video_path']} exceeded --max-frames={args.max_frames}. "
                             "SVeD history requires all prior image placeholders to stay aligned; "
@@ -596,6 +873,53 @@ def generate_predictions(args: argparse.Namespace, rows: list[dict[str, object]]
                         )
                     if not cumulative:
                         answers.append("$silent$")
+                        continue
+
+                    if args.decision_mode == "gate":
+                        if not gate_window:
+                            answers.append("$silent$")
+                            continue
+                        if args.max_frames > 0 and len(gate_window) > args.max_frames:
+                            raise RuntimeError(
+                                f"{row['video_path']} gate frame window exceeded --max-frames={args.max_frames}. "
+                                "Lower --frames-per-interval or --frame-history-chunks."
+                            )
+                        gate_pixel_values = torch.stack(gate_window).to(torch.bfloat16).to(model.device)
+                        gate_num_patches_list = [1] * len(gate_window)
+                        gate_question = build_gate_question(
+                            row,
+                            chunk_idx=chunk_idx,
+                            frame_count=len(gate_window),
+                            max_history_turns=args.max_history_turns,
+                        )
+                        try:
+                            gate_prob = compute_gate_probability(
+                                model,
+                                tokenizer,
+                                gate_pixel_values,
+                                gate_question,
+                                gate_num_patches_list,
+                            )
+                            if gate_prob >= args.gate_threshold:
+                                output_last = generate_gate_response(
+                                    model,
+                                    tokenizer,
+                                    gate_pixel_values,
+                                    gate_question,
+                                    generation_config,
+                                    gate_num_patches_list,
+                                )
+                                answers.append(normalize_interrupt(output_last))
+                            else:
+                                answers.append("$silent$")
+                        except torch.cuda.OutOfMemoryError:
+                            torch.cuda.empty_cache()
+                            raise RuntimeError(
+                                "CUDA OOM during gate evaluation. Try smaller --max-frames, "
+                                "--frame-history-chunks, or --frames-per-interval."
+                            )
+                        iterator.set_postfix(row=row_idx + 1, chunks=len(answers), gate=f"{gate_prob:.3f}")
+                        seen_frame_count += new_frame_count
                         continue
 
                     pixel_values = torch.stack(cumulative).to(torch.bfloat16).to(model.device)
@@ -737,6 +1061,7 @@ def write_run_log(
     log_path = output_path.parent / "log.jsonl"
     log_path.parent.mkdir(parents=True, exist_ok=True)
     now = time.time()
+    gate_head = resolve_gate_head(args)
     log_entry = {
         "timestamp": time.strftime("%Y-%m-%dT%H:%M:%S%z", time.localtime(now)),
         "samples": len(rows),
@@ -749,13 +1074,18 @@ def write_run_log(
         "eval_output_path": str(eval_output_path) if eval_output_path.exists() else None,
         "weights_dir": str(Path(args.weights_dir).resolve()),
         "model_code_dir": str(Path(args.model_code_dir).resolve()),
+        "decision_mode": args.decision_mode,
         "lora_adapter": str(Path(args.lora_adapter).resolve()) if args.lora_adapter else "",
         "llm_lora_adapter": str(Path(args.llm_lora_adapter).resolve()) if args.llm_lora_adapter else "",
         "vision_lora_adapter": str(Path(args.vision_lora_adapter).resolve()) if args.vision_lora_adapter else "",
+        "gate_adapter": str(Path(args.gate_adapter).resolve()) if args.gate_adapter else "",
+        "gate_head": str(gate_head.resolve()) if gate_head else "",
+        "gate_threshold": args.gate_threshold,
         "max_samples": args.max_samples,
         "frames_per_interval": args.frames_per_interval,
         "max_frames": args.max_frames,
         "max_history_turns": args.max_history_turns,
+        "frame_history_chunks": args.frame_history_chunks,
         "max_new_tokens": args.max_new_tokens,
         "decode_factor": args.decode_factor,
         "ppl_runs": args.ppl_runs,
@@ -787,6 +1117,10 @@ def main() -> None:
 
     if args.eval_only and args.generate_only:
         raise ValueError("--eval-only and --generate-only cannot be used together.")
+    if not 0.0 <= args.gate_threshold <= 1.0:
+        raise ValueError("--gate-threshold must be in [0, 1].")
+    if args.frame_history_chunks < 0:
+        raise ValueError("--frame-history-chunks must be >= 0.")
 
     generation_seconds: float | None = None
     scoring_seconds: float | None = None

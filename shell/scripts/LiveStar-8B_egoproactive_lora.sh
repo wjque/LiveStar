@@ -37,7 +37,7 @@ FORCE_PREPARE=${FORCE_PREPARE:-0}
 MODEL_CODE_DIR=${MODEL_CODE_DIR:-${PROJECT_ROOT}/inference}
 WEIGHTS_DIR=${WEIGHTS_DIR:-/data1/LiveStar_8B}
 RUNTIME_MODEL_DIR=${RUNTIME_MODEL_DIR:-${PROJECT_ROOT}/work_dirs/runtime/LiveStar_8B}
-OUTPUT_DIR=${OUTPUT_DIR:-/data1/finetune/model/lora_adapter}
+OUTPUT_DIR=${OUTPUT_DIR:-/data1/finetune/model/gate_lora_adapter}
 META_PATH=${META_PATH:-${DATA_OUTPUT_DIR}/meta/egoproactive_train_meta.json}
 
 USE_LLM_LORA=${USE_LLM_LORA:-16}
@@ -55,6 +55,9 @@ SAVE_STEPS=${SAVE_STEPS:-200}
 MAX_SEQ_LENGTH=${MAX_SEQ_LENGTH:-8192}
 DEEPSPEED_CONFIG=${DEEPSPEED_CONFIG:-${PROJECT_ROOT}/zero_stage1_config.json}
 REPORT_TO=${REPORT_TO:-tensorboard}
+GATE_LOSS_WEIGHT=${GATE_LOSS_WEIGHT:-4.0}
+LM_LOSS_WEIGHT=${LM_LOSS_WEIGHT:-1.0}
+GATE_POS_WEIGHT=${GATE_POS_WEIGHT:-0.0}
 
 mkdir -p "${OUTPUT_DIR}" "${RUNTIME_MODEL_DIR}"
 
@@ -99,7 +102,7 @@ torchrun \
   --master_addr="${MASTER_ADDR}" \
   --nproc_per_node="${GPUS}" \
   --master_port="${MASTER_PORT}" \
-  livestar/train/livestar_chat_finetune.py \
+  livestar/train/livestar_gate_finetune.py \
   --model_name_or_path "${RUNTIME_MODEL_DIR}" \
   --conv_style "internvl2_5" \
   --use_fast_tokenizer False \
@@ -134,6 +137,9 @@ torchrun \
   --lr_scheduler_type "cosine" \
   --logging_steps 1 \
   --max_seq_length "${MAX_SEQ_LENGTH}" \
+  --gate_loss_weight "${GATE_LOSS_WEIGHT}" \
+  --lm_loss_weight "${LM_LOSS_WEIGHT}" \
+  --gate_pos_weight "${GATE_POS_WEIGHT}" \
   --do_train True \
   --grad_checkpoint True \
   --group_by_length True \
