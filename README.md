@@ -1,15 +1,17 @@
 <div align="center">
 
-# **LiveStar: Live Streaming Assistant for Real-World Online Video Understanding**
+# **LiveStar & LiveStarPro: Live Streaming Assistant for Real-World Online Video Understanding**
 
-[\[📖 Paper\]](https://arxiv.org/abs/2511.05299) [\[🤖 HF Model\]](https://huggingface.co/yzy666/LiveStar_8B) [\[🤗 HF Dataset\]](https://huggingface.co/datasets/yzy666/OmniStar-RNG) [\[🎬 Base Model\]](https://huggingface.co/yzy666/LiveStar_InternVideo_8B) [\[📄 中文解读\]](https://mp.weixin.qq.com/s/GdkpgCxrAlbVrN6AAQn74A) 
+[\[📖 LiveStarPro Paper\]](https://arxiv.org/abs/2606.17798) [\[📖 LiveStar Paper (NeurIPS'25)\]](https://arxiv.org/abs/2511.05299) [\[🤖 HF Model\]](https://huggingface.co/yzy666/LiveStar_8B) [\[🤗 HF Dataset\]](https://huggingface.co/datasets/yzy666/OmniStar-RNG) [\[🎬 Base Model\]](https://huggingface.co/yzy666/LiveStar_InternVideo_8B) [\[📄 中文解读\]](https://mp.weixin.qq.com/s/GdkpgCxrAlbVrN6AAQn74A) 
 
 </div>
 
-This is the **code repository** for the paper ***LiveStar: Live-Streaming Assistant for Real-World Online Video Understanding***, providing code, data, and pipeline to support the LiveStar model and the OmniStar dataset introduced in the work. 🚀🚀🚀
+This is the **code repository** for ***LiveStar*** (NeurIPS 2025) and its journal extension ***LiveStarPro***. It provides the code, data, and pipeline for both models: LiveStar for real-time online video understanding, and LiveStarPro, which extends it with hierarchical memory for long-horizon streams. Both models can be run from the same inference harness for direct comparison (see [LiveStarPro](#livestarpro-)). 🚀🚀🚀
 
 
 ## News & Updates 🚀  
+- `2026-07-02`:  
+  🔥 **LiveStarPro Released**: The journal extension **LiveStarPro** is now available ([arXiv](https://arxiv.org/abs/2606.17798)). It adds **Tree-Structured Hierarchical Memory (TSHM)** for long-horizon streams and a **Streaming KV Cache** for faster inference — both at inference time on the same `LiveStar-8B` weights. Run it with the `--pro` flag (see [LiveStarPro](#livestarpro-)).
 - `2025-09-19`:  
   🔥 **Paper Accepted**: Our work has been accepted to NeurIPS 2025! The [arXiv](https://arxiv.org/abs/2511.05299) version is now available — try our LiveStar model for streaming inference today!
 - `2025-05-27`:  
@@ -44,20 +46,39 @@ git clone https://github.com/sotayang/LiveStar.git
 cd LiveStar
 ```
 
-2. Install Python dependencies (Ensure you have Python version >= 3.9 installed). For GPU support, CUDA 12.2 or compatible drivers are required.
+2. Install Python dependencies. Requirements: Python >= 3.9, and an NVIDIA GPU whose driver supports CUDA 12.x.
+
+> **Note:** `flash-attn` must be installed **after** PyTorch and needs a CUDA toolkit (`nvcc`) at build time. It is therefore installed as a separate step below and is intentionally **not** listed in `requirements.txt` (otherwise `pip install -r requirements.txt` fails with `ModuleNotFoundError: No module named 'torch'`).
+
+**Step 1 - create the environment and install PyTorch first:**
 ```bash
 conda create -n LiveStar -y python=3.9.21
 conda activate LiveStar
-conda install -y -c pytorch pytorch=2.5.1 torchvision=0.10.1
-pip install transformers==4.37.2 opencv-python==4.11.0.84 imageio==2.37.0 decord==0.6.0 gradio==4.44.1
-pip install flash-attn --no-build-isolation
+pip install torch==2.5.1 torchvision==0.20.1
 ```
-Alternative: Install via requirements.txt (**recommended**):
+
+**Step 2 - install the remaining dependencies:**
 ```bash
 pip install -r requirements.txt
 ```
 
+**Step 3 - install flash-attn (requires a CUDA toolkit / `nvcc`):**
+```bash
+# If nvcc is not already on your machine, install a CUDA toolkit, e.g. via conda:
+conda install -y -c nvidia cuda-toolkit=12.4
+export CUDA_HOME=$CONDA_PREFIX   # must point to the env root, NOT targets/x86_64-linux
+
+# Build flash-attn from source. FLASH_ATTENTION_FORCE_BUILD=TRUE skips the prebuilt
+# wheel download from GitHub (needed on machines without direct GitHub access).
+# Optional: FLASH_ATTN_CUDA_ARCHS limits the build to your GPU's compute capability,
+# which cuts build time drastically (e.g. 80 for A100/A800, 90 for H100; ";"-separated
+# for multiple). Omit it to build for all archs (80;90;100;120) - much slower.
+MAX_JOBS=32 FLASH_ATTENTION_FORCE_BUILD=TRUE FLASH_ATTN_CUDA_ARCHS=80 pip install flash_attn==2.7.4.post1 --no-build-isolation
+```
+
 ### **Model Acquisition**
+
+> **Tip:** if `huggingface.co` is slow or unreachable, prefix the download commands with `HF_ENDPOINT=https://hf-mirror.com` to use the mirror.
 
 1. Download Fine-Tuned LiveStar Model (Recommended):
 
@@ -162,7 +183,7 @@ To run an inference with the LiveStar model, follow these steps:
    cd LiveStar/inference
    ```
 
-(2) Ensure that the model path in your script matches the actual path to the downloaded weights: `model_path = 'LiveStar/inference'`. To use your own video file, modify the following line: `video_path = "sample.mp4"`.
+(2) Ensure that the model path in your script matches the actual path to the downloaded weights: `model_path = './'`. The script runs on a bundled sample video by default (`video_path = "../assets/videos/HPtIGhOsViM.mp4"`); to use your own video, edit that `video_path` line in `demo.py`.
 
 (3) Execute the inference script using the following command:
    ```bash
@@ -173,6 +194,51 @@ To run an inference with the LiveStar model, follow these steps:
    python demo_ui.py
    ```
 ![Visualization](./assets/images/LiveStar_visualization.png)
+
+## **LiveStarPro** 🌟
+
+**LiveStarPro** is the journal extension of LiveStar for **long-horizon** online video understanding. It keeps LiveStar's SVeD inference and SCAM training unchanged and adds two inference-time modules — no retraining is needed, the **same** `LiveStar-8B` weights are used:
+
+- **Tree-Structured Hierarchical Memory (TSHM)** — a two-tier memory for effectively unbounded streams:
+  - *Short-Term Working Memory*: Peak-End compression keeps salient keyframes (low-perplexity "peaks") plus each clip's summary caption, bounding the active context regardless of stream length.
+  - *Long-Term Retrieval Memory*: evicted events are organized into a **Recursive Event Tree** (semantically similar events are attached as children, with momentum-updated parent embeddings). When a response is triggered, a **hierarchical beam-descent** retrieval re-injects relevant historical event chains, with a temporal gate so only genuinely distant events are recalled.
+- **Streaming KV Cache** — caches per-frame visual features and reuses the attention key/value of the stable context prefix across streaming steps, avoiding redundant recomputation of history.
+
+### Highlights 📈
+
+As reported in the paper, LiveStarPro sets a new state of the art for online video understanding:
+
+- **+28.9% semantic correctness (SemCor)** and **−18.2% timing difference (TimDiff)** relative to prior online Video-LLMs — up from LiveStar's +19.5% — together with **+16.1% FPS**.
+- **1.58× inference speedup** from the Streaming KV Cache versus the same model without caching, sustaining ~3 FPS on hour-long streams.
+- **Long-horizon recall**: on the long (>30 min) memory-span bucket, the Recursive Event Tree reaches **37.2%** recall versus **21.3%** for a flat retrieval bank and near-chance for sliding-window baselines, while degrading far more gracefully as the memory span grows.
+
+### Running LiveStar vs. LiveStarPro
+
+Both modes share a single entry point, `inference/streaming_infer.py`, so a controlled comparison is one flag away:
+
+```bash
+cd LiveStar/inference
+
+# LiveStar (base): SVeD + short-term Peak-End memory, no long-term retrieval
+python streaming_infer.py --video ../assets/videos/HPtIGhOsViM.mp4
+
+# LiveStarPro: adds the Recursive Event Tree, gated retrieval, and streaming KV cache
+python streaming_infer.py --video ../assets/videos/HPtIGhOsViM.mp4 --pro
+```
+
+Common flags (run `python streaming_infer.py -h` for the full list):
+
+| Flag | Default | Meaning |
+|------|---------|---------|
+| `--pro` | off | Enable the full LiveStarPro stack (TSHM tree + gated retrieval + KV cache) |
+| `--l-max` | 160 | Active-context token budget that triggers Peak-End compression |
+| `--alpha` | 1.06 | SVeD response-silence sensitivity (larger = fewer responses) |
+| `--sigma` / `--beta` | 0.75 / 0.3 | Event-tree attach threshold / parent-embedding momentum |
+| `--recall-min-gap` | 8 (with `--pro`) | Only recall events at least this many frames in the past |
+| `--kv` | on with `--pro` | Reuse the verification-path streaming KV cache |
+| `--trace` | off | Print per-frame SVeD / memory / retrieval decisions |
+
+> `demo.py` remains the reference LiveStar inference script. `streaming_infer.py` reproduces LiveStar behavior without `--pro`, and layers LiveStarPro on top with `--pro`, keeping the harness identical for a fair comparison.
 
 ## **Training**
 
@@ -255,6 +321,13 @@ We would like to extend our sincere gratitude to the following projects, which w
 If you find our data useful, please consider citing our work!
 
 ```BibTeX
+@article{yang2026livestarpro,
+  title={LiveStarPro: Proactive Streaming Video Understanding with Hierarchical Memory for Long-Horizon Streams},
+  author={Yang, Zhenyu and Zhang, Kairui and Wang, Bing and Qian, Shengsheng and Xu, Changsheng},
+  journal={arXiv preprint arXiv:2606.17798},
+  year={2026}
+}
+
 @article{yang2025livestar,
   title={LiveStar: Live Streaming Assistant for Real-World Online Video Understanding},
   author={Yang, Zhenyu and Zhang, Kairui and Hu, Yuhang and Wang, Bing and Qian, Shengsheng and Wen, Bin and Yang, Fan and Gao, Tingting and Dong, Weiming and Xu, Changsheng},

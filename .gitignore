@@ -30,3 +30,13 @@ build/
 
 # Zed编辑器配置
 .zed/
+
+# Backups
+*.bak*
+
+# Downloaded model weights (fetch from Hugging Face per README)
+inference/*.safetensors
+
+# Runtime / download artifacts
+inference/examples/
+inference/.cache/
