@@ -299,6 +299,8 @@ def load_livestar_model(runtime_model_dir: Path, args: argparse.Namespace):
             config=config,
             use_flash_attn=False,
         ).cuda().to(torch.bfloat16)
+        model._init_gate_head()
+        model.gate_head.float()
         model.img_context_token_id = tokenizer.convert_tokens_to_ids(IMG_CONTEXT_TOKEN)
         model.system_message = GATE_SYSTEM_PROMPT
     else:

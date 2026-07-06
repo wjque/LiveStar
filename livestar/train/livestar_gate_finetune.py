@@ -58,6 +58,7 @@ from torch.utils.data import Dataset
 from transformers import (AutoConfig, AutoModelForCausalLM, AutoTokenizer,
                           HfArgumentParser, Trainer, TrainingArguments,
                           set_seed)
+from transformers.trainer_callback import PrinterCallback, ProgressCallback
 from transformers.trainer_utils import get_last_checkpoint
 from transformers.utils.logging import (enable_default_handler,
                                         enable_explicit_format, set_verbosity)
@@ -325,7 +326,11 @@ def preprocess_internvl2_5_gate(
 
     input_ids = torch.tensor(np.concatenate(final_input_ids))[:tokenizer.model_max_length]
     targets = torch.tensor(np.concatenate(final_targets))[:tokenizer.model_max_length]
-    gate_position = min(gate_position, input_ids.size(0) - 1)
+    if gate_position >= input_ids.size(0):
+        raise ValueError(
+            f'Gate position {gate_position} was truncated by max_seq_length={tokenizer.model_max_length}. '
+            'Increase MAX_SEQ_LENGTH or reduce frame/history length.'
+        )
 
     padding = False if group_by_length or use_packed_ds else True
     if padding:
@@ -1178,17 +1183,51 @@ def len2weight(x, loss_reduction):
 
 
 class GateTrainer(Trainer):
+    @staticmethod
+    def _finite_scalar(value):
+        if value is None:
+            return None
+        if isinstance(value, torch.Tensor):
+            value = value.detach().float()
+            if not torch.isfinite(value).all():
+                return None
+            return value.mean().item()
+        try:
+            value = float(value)
+        except (TypeError, ValueError):
+            return None
+        return value if math.isfinite(value) else None
+
     def log(self, logs, *args, **kwargs):
-        model = self.model
-        if hasattr(model, 'module'):
-            model = model.module
-        if hasattr(model, '_last_lm_loss') and model._last_lm_loss is not None:
-            logs['lm_loss'] = round(float(model._last_lm_loss), 6)
-        if hasattr(model, '_last_gate_loss') and model._last_gate_loss is not None:
-            logs['gate_loss'] = round(float(model._last_gate_loss), 6)
-        if hasattr(model, '_last_gate_prob') and model._last_gate_prob is not None:
-            logs['gate_prob'] = round(float(model._last_gate_prob), 6)
+        is_train_step_log = 'loss' in logs and 'train_runtime' not in logs
+        if is_train_step_log:
+            model = self.model
+            if hasattr(model, 'module'):
+                model = model.module
+            lm_loss = self._finite_scalar(getattr(model, '_last_lm_loss', None))
+            gate_loss = self._finite_scalar(getattr(model, '_last_gate_loss', None))
+            gate_prob = self._finite_scalar(getattr(model, '_last_gate_prob', None))
+            if lm_loss is not None:
+                logs['lm_loss'] = round(lm_loss, 6)
+            if gate_loss is not None:
+                logs['gate_loss'] = round(gate_loss, 6)
+            if gate_prob is not None:
+                logs['gate_prob'] = round(gate_prob, 6)
         super().log(logs, *args, **kwargs)
+
+
+class GateProgressCallback(ProgressCallback):
+    def on_log(self, args, state, control, logs=None, **kwargs):
+        if not state.is_world_process_zero or self.training_bar is None or logs is None:
+            return
+
+        postfix = {}
+        if 'loss' in logs:
+            postfix['train_loss'] = logs['loss']
+        if 'gate_prob' in logs:
+            postfix['gate_prob'] = logs['gate_prob']
+        if postfix:
+            self.training_bar.set_postfix(postfix, refresh=False)
 
 
 def main():
@@ -1216,6 +1255,7 @@ def main():
         raise ValueError('Gate fine-tuning does not support --use_packed_ds yet.')
 
     training_args.use_packed_ds = data_args.use_packed_ds
+    training_args.logging_nan_inf_filter = False
 
     # Sending telemetry. Tracking the example usage helps us better allocate resources to maintain them. The
     # information sent is the one passed as arguments along with your Python/PyTorch versions.
@@ -1346,6 +1386,8 @@ def main():
         logger.info('Building InternVLGateModel...')
         model = InternVLChatModel(internvl_chat_config, vision_model, llm)
     model.img_context_token_id = img_context_token_id
+    model._init_gate_head()
+    model.gate_head.float()
 
     assert model.config.downsample_ratio == data_args.down_sample_ratio
 
@@ -1460,6 +1502,10 @@ def main():
         tokenizer=tokenizer,
         data_collator=collator,
     )
+    trainer.remove_callback(ProgressCallback)
+    trainer.remove_callback(PrinterCallback)
+    if not training_args.disable_tqdm:
+        trainer.add_callback(GateProgressCallback)
 
     # Training
     if training_args.do_train:

@@ -55,7 +55,7 @@ def bipartite_soft_matching(
     assert r > 0, r
 
     with torch.no_grad():
-        metric = metric / metric.norm(dim=-1, keepdim=True)
+        metric = metric / metric.norm(dim=-1, keepdim=True).clamp_min(1e-6)
         a, b = metric[..., ::2, :], metric[..., 1::2, :]
         scores = a @ b.transpose(-1, -2)
 
@@ -202,10 +202,21 @@ class InternVLChatModel(PreTrainedModel):
             nn.Dropout(config.gate_dropout),
             nn.Linear(gate_hidden_size, 1),
         )
+        self._init_gate_head()
 
         self.img_context_token_id = None
         self.conv_template = get_conv_template(self.template)
         self.system_message = self.conv_template.system_message
+
+    def _init_gate_head(self):
+        for module in self.gate_head.modules():
+            if isinstance(module, nn.LayerNorm):
+                nn.init.ones_(module.weight)
+                nn.init.zeros_(module.bias)
+            elif isinstance(module, nn.Linear):
+                nn.init.normal_(module.weight, mean=0.0, std=1e-3)
+                if module.bias is not None:
+                    nn.init.zeros_(module.bias)
 
     def wrap_llm_lora(self, r=16, lora_alpha=32, lora_dropout=0.05):
         try:
@@ -300,19 +311,6 @@ class InternVLChatModel(PreTrainedModel):
     ) -> Union[Tuple, CausalLMOutputWithPast]:
         return_dict = return_dict if return_dict is not None else self.config.use_return_dict
 
-        if labels is not None:
-            mask = labels != -100
-            if mask.any():
-                mask_float = mask.unsqueeze(1).float()
-                padded_mask = torch.nn.functional.pad(mask_float, (1, 4), mode='constant', value=0)
-                extended = torch.nn.functional.conv1d(padded_mask, torch.ones(1, 1, 6, device=mask.device), padding=0)
-                extended_mask = extended.squeeze(1) > 0
-                extended_mask = extended_mask[:, :attention_mask.size(1)]
-
-                assert attention_mask.shape == extended_mask.shape, "Shape mismatch!"
-                attention_mask = attention_mask.clone()
-                attention_mask[extended_mask] = False
-        
         image_flags = image_flags.squeeze(-1)
         input_embeds = self.language_model.get_input_embeddings()(input_ids).clone()
 
@@ -322,13 +320,6 @@ class InternVLChatModel(PreTrainedModel):
 
         B, N, C = input_embeds.shape
         input_embeds = input_embeds.reshape(B * N, C)
-
-        if (
-            torch.distributed.is_available()
-            and torch.distributed.is_initialized()
-            and torch.distributed.get_rank() == 0
-        ):
-            print(f'dynamic ViT batch size: {vit_batch_size}, images per sample: {vit_batch_size / B}, dynamic token length: {N}')
 
         input_ids = input_ids.reshape(B * N)
         selected = (input_ids == self.img_context_token_id)
@@ -369,6 +360,8 @@ class InternVLChatModel(PreTrainedModel):
                 # Enable model parallelism
                 shift_labels = shift_labels.to(shift_logits.device)
                 lm_loss = loss_fct(shift_logits, shift_labels)
+                if not torch.isfinite(lm_loss):
+                    raise FloatingPointError(f'Non-finite lm_loss detected: {lm_loss.detach().float().item()}')
 
         gate_loss = None
         gate_logits = None
@@ -381,15 +374,27 @@ class InternVLChatModel(PreTrainedModel):
             gate_positions = gate_positions.clamp(min=0, max=hidden_states.shape[1] - 1)
             batch_indices = torch.arange(hidden_states.shape[0], device=hidden_states.device)
             gate_states = hidden_states[batch_indices, gate_positions]
-            gate_logits = self.gate_head(gate_states).squeeze(-1)
+            if not torch.isfinite(gate_states).all():
+                raise FloatingPointError('Non-finite hidden states detected at gate positions.')
+            self.gate_head.float()
+            gate_states = gate_states.float().clamp(min=-1e4, max=1e4)
+            with torch.autocast(device_type=gate_states.device.type, enabled=False):
+                gate_logits = self.gate_head(gate_states).squeeze(-1)
+            if not torch.isfinite(gate_logits).all():
+                raise FloatingPointError('Non-finite gate logits detected.')
 
             if gate_labels is not None:
                 gate_labels = gate_labels.to(gate_logits.device).float()
+                if gate_labels.shape != gate_logits.shape:
+                    gate_labels = gate_labels.view_as(gate_logits)
                 pos_weight = None
                 effective_pos_weight = self.config.gate_pos_weight if gate_pos_weight is None else gate_pos_weight
                 if effective_pos_weight is not None and effective_pos_weight > 0:
-                    pos_weight = torch.tensor(effective_pos_weight, dtype=gate_logits.dtype, device=gate_logits.device)
-                gate_loss = BCEWithLogitsLoss(pos_weight=pos_weight)(gate_logits, gate_labels)
+                    pos_weight = torch.tensor(effective_pos_weight, dtype=torch.float32, device=gate_logits.device)
+                with torch.autocast(device_type=gate_logits.device.type, enabled=False):
+                    gate_loss = BCEWithLogitsLoss(pos_weight=pos_weight)(gate_logits.float(), gate_labels)
+                if not torch.isfinite(gate_loss):
+                    raise FloatingPointError(f'Non-finite gate_loss detected: {gate_loss.detach().float().item()}')
                 self._last_gate_loss = gate_loss.detach()
             self._last_gate_prob = torch.sigmoid(gate_logits.detach()).mean()
 
@@ -402,6 +407,8 @@ class InternVLChatModel(PreTrainedModel):
             losses.append(gate_weight * gate_loss)
         if losses:
             loss = sum(losses)
+            if not torch.isfinite(loss):
+                raise FloatingPointError(f'Non-finite total loss detected: {loss.detach().float().item()}')
         if lm_loss is not None:
             self._last_lm_loss = lm_loss.detach()
 
