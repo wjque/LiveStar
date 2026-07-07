@@ -2,6 +2,8 @@ import argparse
 import json
 import os
 import random
+import subprocess
+import sys
 import tempfile
 from collections import Counter
 from pathlib import Path
@@ -13,7 +15,22 @@ DEFAULT_ANN_FILE = DEFAULT_DATA_ROOT / "wearable_ai_2026_egoproactive_val_700.js
 DEFAULT_VIDEO_DIR = DEFAULT_DATA_ROOT / "val"
 DEFAULT_MODEL_PATH = REPO_ROOT / "inference"
 DEFAULT_WEIGHTS_DIR = Path("/data1/LiveStar_8B")
-DEFAULT_OUTPUT = REPO_ROOT / "evaluate" / "output" / "egoproactive_sved_sample10.jsonl"
+DEFAULT_FRAMES_PER_INTERVAL = 4
+DEFAULT_MAX_CONTEXT_INTERVALS = 20
+DEFAULT_MAX_CONTEXT_FRAMES = 0
+DEFAULT_MAX_HISTORY_TURNS = 20
+DEFAULT_OUTPUT = (
+    REPO_ROOT
+    / "evaluate"
+    / "output"
+    / (
+        "egoproactive_sved_sample350_"
+        f"fpi{DEFAULT_FRAMES_PER_INTERVAL}_"
+        f"ctxi{DEFAULT_MAX_CONTEXT_INTERVALS}_"
+        f"f{DEFAULT_FRAMES_PER_INTERVAL * DEFAULT_MAX_CONTEXT_INTERVALS}_"
+        f"hist{DEFAULT_MAX_HISTORY_TURNS}_majority1.jsonl"
+    )
+)
 
 IMAGENET_MEAN = (0.485, 0.456, 0.406)
 IMAGENET_STD = (0.229, 0.224, 0.225)
@@ -37,7 +54,7 @@ def parse_args():
     parser.add_argument("--model-path", type=Path, default=DEFAULT_MODEL_PATH)
     parser.add_argument("--weights-dir", type=Path, default=DEFAULT_WEIGHTS_DIR)
     parser.add_argument("--output", type=Path, default=DEFAULT_OUTPUT)
-    parser.add_argument("--num-samples", type=int, default=10)
+    parser.add_argument("--num-samples", type=int, default=350)
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--alpha", type=float, default=1.06)
     parser.add_argument("--num-runs", type=int, default=5)
@@ -45,8 +62,18 @@ def parse_args():
     parser.add_argument("--check-len", type=int, default=1000)
     parser.add_argument("--input-size", type=int, default=448)
     parser.add_argument("--max-num", type=int, default=1)
+    parser.add_argument("--frames-per-interval", type=int, default=DEFAULT_FRAMES_PER_INTERVAL)
+    parser.add_argument("--max-context-intervals", type=int, default=DEFAULT_MAX_CONTEXT_INTERVALS)
+    parser.add_argument("--max-context-frames", type=int, default=DEFAULT_MAX_CONTEXT_FRAMES)
+    parser.add_argument("--max-history-turns", type=int, default=DEFAULT_MAX_HISTORY_TURNS)
+    parser.add_argument("--clear-cache-per-video", dest="clear_cache_per_video", action="store_true", default=True)
+    parser.add_argument("--no-clear-cache-per-video", dest="clear_cache_per_video", action="store_false")
     parser.add_argument("--max-intervals-per-video", type=int, default=0)
     parser.add_argument("--device", default="cuda")
+    parser.add_argument("--gpus", default="4,5,6,7")
+    parser.add_argument("--worker-input", type=Path, default=None)
+    parser.add_argument("--shard-index", type=int, default=-1)
+    parser.add_argument("--total-shards", type=int, default=1)
     parser.add_argument("--dry-run", action="store_true")
     return parser.parse_args()
 
@@ -119,6 +146,49 @@ def sample_records(records, num_samples, seed):
         return list(records)
     rng = random.Random(seed)
     return rng.sample(records, num_samples)
+
+
+def attach_sample_order(records):
+    for idx, record in enumerate(records):
+        record["sample_order"] = idx
+    return records
+
+
+def parse_gpus(gpus):
+    return [gpu.strip() for gpu in str(gpus).split(",") if gpu.strip()]
+
+
+def estimate_work(record, frames_per_interval):
+    return len(record["video_intervals"]) * max(1, int(frames_per_interval))
+
+
+def shard_records(records, num_shards, frames_per_interval):
+    shards = [{"records": [], "work": 0} for _ in range(num_shards)]
+    ordered = sorted(
+        records,
+        key=lambda item: estimate_work(item, frames_per_interval),
+        reverse=True,
+    )
+    for record in ordered:
+        shard = min(shards, key=lambda item: item["work"])
+        shard["records"].append(record)
+        shard["work"] += estimate_work(record, frames_per_interval)
+    for shard in shards:
+        shard["records"].sort(key=lambda item: item.get("sample_order", 0))
+    return shards
+
+
+def write_records_jsonl(path, records):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("w", encoding="utf-8") as f:
+        for record in records:
+            json.dump(record, f, ensure_ascii=False)
+            f.write("\n")
+
+
+def read_records_jsonl(path):
+    with path.open("r", encoding="utf-8") as f:
+        return [json.loads(line) for line in f if line.strip()]
 
 
 def has_model_weights(model_dir):
@@ -233,7 +303,23 @@ def interval_midpoint(interval):
     return max(0.0, (float(start) + float(end)) / 2.0)
 
 
-def load_interval_frames(video_path, intervals, input_size=448, max_num=1):
+def interval_sample_times(interval, frames_per_interval):
+    start, end = interval
+    start = max(0.0, float(start))
+    end = max(start, float(end))
+    frames_per_interval = max(1, int(frames_per_interval))
+    if frames_per_interval == 1:
+        return [interval_midpoint((start, end))]
+    if end == start:
+        return [start for _ in range(frames_per_interval)]
+    span = end - start
+    return [
+        start + span * (sample_idx + 0.5) / frames_per_interval
+        for sample_idx in range(frames_per_interval)
+    ]
+
+
+def load_interval_frames(video_path, intervals, input_size=448, max_num=1, frames_per_interval=1):
     import torch
     from decord import VideoReader, cpu
     from PIL import Image
@@ -247,27 +333,145 @@ def load_interval_frames(video_path, intervals, input_size=448, max_num=1):
 
     pixel_values_list = []
     num_patches_list = []
-    frame_indices = []
-    frame_times = []
+    interval_samples = []
     for interval in intervals:
-        timestamp = interval_midpoint(interval)
-        frame_idx = min(max_frame, max(0, int(round(timestamp * fps))))
-        image = Image.fromarray(vr[frame_idx].asnumpy()).convert("RGB")
-        tiles = dynamic_preprocess(
-            image, image_size=input_size, use_thumbnail=True, max_num=max_num
+        sampled_times = interval_sample_times(interval, frames_per_interval)
+        frame_indices = []
+        frame_times = []
+        for timestamp in sampled_times:
+            frame_idx = min(max_frame, max(0, int(round(timestamp * fps))))
+            image = Image.fromarray(vr[frame_idx].asnumpy()).convert("RGB")
+            tiles = dynamic_preprocess(
+                image, image_size=input_size, use_thumbnail=True, max_num=max_num
+            )
+            pixel_values = torch.stack([transform(tile) for tile in tiles])
+            pixel_values_list.append(pixel_values)
+            num_patches_list.append(pixel_values.shape[0])
+            frame_indices.append(frame_idx)
+            frame_times.append(frame_idx / fps)
+        interval_samples.append(
+            {
+                "target_times_sec": sampled_times,
+                "frame_indices": frame_indices,
+                "frame_times_sec": frame_times,
+            }
         )
-        pixel_values = torch.stack([transform(tile) for tile in tiles])
-        pixel_values_list.append(pixel_values)
-        num_patches_list.append(pixel_values.shape[0])
-        frame_indices.append(frame_idx)
-        frame_times.append(frame_idx / fps)
 
-    return torch.cat(pixel_values_list), num_patches_list, frame_indices, frame_times
+    return torch.cat(pixel_values_list), num_patches_list, interval_samples
 
 
-def pixel_prefix(pixel_values, num_patches_list, end_frame):
-    patch_count = sum(num_patches_list[:end_frame])
+def pixel_prefix(pixel_values, num_patches_list, end_sample):
+    patch_count = sum(num_patches_list[:end_sample])
     return pixel_values[:patch_count]
+
+
+def sample_patch_bounds(num_patches_list, sample_id):
+    if sample_id < 1 or sample_id > len(num_patches_list):
+        raise IndexError(
+            f"sample_id={sample_id} is outside 1..{len(num_patches_list)}"
+        )
+    start = sum(num_patches_list[: sample_id - 1])
+    end = start + num_patches_list[sample_id - 1]
+    return start, end
+
+
+def pixel_select(pixel_values, num_patches_list, sample_ids):
+    import torch
+
+    if not sample_ids:
+        return pixel_values[:0], []
+
+    chunks = []
+    selected_num_patches = []
+    for sample_id in sample_ids:
+        start, end = sample_patch_bounds(num_patches_list, sample_id)
+        chunks.append(pixel_values[start:end])
+        selected_num_patches.append(num_patches_list[sample_id - 1])
+    return torch.cat(chunks, dim=0), selected_num_patches
+
+
+def make_frame_prompt(start_frame_number, count):
+    return "".join(
+        f"Frame-{frame_number}: <image>\n"
+        for frame_number in range(start_frame_number, start_frame_number + count)
+    )
+
+
+def make_frame_prompt_for_ids(frame_numbers):
+    return "".join(f"Frame-{frame_number}: <image>\n" for frame_number in frame_numbers)
+
+
+def build_window_history(history_entries, current_sample_id, args, query):
+    max_context_frames = int(getattr(args, "max_context_frames", 0) or 0)
+    min_sample = 1
+    if max_context_frames > 0:
+        min_sample = max(1, current_sample_id - max_context_frames + 1)
+
+    entries = []
+    for entry in history_entries:
+        frame_ids = [
+            sample_id
+            for sample_id in entry["frame_ids"]
+            if min_sample <= sample_id <= current_sample_id
+        ]
+        if frame_ids:
+            entries.append((frame_ids, entry["answer"]))
+
+    max_history_turns = int(getattr(args, "max_history_turns", 0) or 0)
+    if max_history_turns > 0:
+        entries = entries[-max_history_turns:]
+
+    history = []
+    retained_sample_ids = []
+    for entry_idx, (frame_ids, answer) in enumerate(entries):
+        question = make_frame_prompt_for_ids(frame_ids)
+        if entry_idx == 0:
+            question = PROACTIVE_TASK_PROMPT.format(query=query) + question
+        history.append((question, answer))
+        retained_sample_ids.extend(frame_ids)
+
+    return history, retained_sample_ids
+
+
+def build_chat_inputs(
+    pixel_values,
+    num_patches_list,
+    history_entries,
+    current_sample_id,
+    args,
+    query,
+    self_check=False,
+):
+    history, history_sample_ids = build_window_history(
+        history_entries,
+        current_sample_id,
+        args,
+        query,
+    )
+
+    if self_check:
+        if not history_sample_ids or history_sample_ids[-1] != current_sample_id:
+            raise RuntimeError(
+                "self_check requires the current sampled frame to be present "
+                "as the last history frame"
+            )
+        input_sample_ids = history_sample_ids
+    else:
+        input_sample_ids = history_sample_ids + [current_sample_id]
+
+    selected_pixels, selected_num_patches = pixel_select(
+        pixel_values,
+        num_patches_list,
+        input_sample_ids,
+    )
+    context_info = {
+        "history_turns": len(history),
+        "history_frames": len(history_sample_ids),
+        "input_frames": len(input_sample_ids),
+        "first_input_sample": input_sample_ids[0] if input_sample_ids else None,
+        "last_input_sample": input_sample_ids[-1] if input_sample_ids else None,
+    }
+    return selected_pixels, selected_num_patches, history, context_info
 
 
 def check_answer_text(text, max_chars):
@@ -326,118 +530,257 @@ def generate_response(
     return response, new_history
 
 
+def is_oom_error(exc):
+    message = str(exc).lower()
+    return "out of memory" in message or exc.__class__.__name__ == "OutOfMemoryError"
+
+
+def clear_cuda_cache():
+    try:
+        import torch
+
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+            torch.cuda.ipc_collect()
+    except Exception:
+        pass
+
+
+def make_error_result(record, args, error_type, exc):
+    return {
+        "sample_order": record.get("sample_order"),
+        "shard_index": getattr(args, "shard_index", -1),
+        "video_path": record["video_path"],
+        "query": record["query"],
+        "domain": record["domain"],
+        "task": record["task"],
+        "duration_in_sec": record["duration_in_sec"],
+        "interval_accuracy": 0.0,
+        "num_intervals": 0,
+        "expected_num_intervals": len(record.get("video_intervals", [])),
+        "interval_results": [],
+        "error": True,
+        "error_type": error_type,
+        "error_message": str(exc)[:1000],
+    }
+
+
 def evaluate_record(record, model, tokenizer, generation_config, args):
     import torch
 
-    pixel_values, num_patches_list, frame_indices, frame_times = load_interval_frames(
+    pixel_values, num_patches_list, interval_samples = load_interval_frames(
         record["video_file"],
         record["video_intervals"],
         input_size=args.input_size,
         max_num=args.max_num,
+        frames_per_interval=args.frames_per_interval,
     )
     pixel_values = pixel_values.to(torch.bfloat16).to(model.device)
 
-    history = None
+    history_entries = []
     last_response = None
     threshold = None
     interval_results = []
+    sample_cursor = 0
 
     for interval_idx, interval in enumerate(record["video_intervals"]):
-        end_frame = interval_idx + 1
-        cur_pixel_values = pixel_prefix(pixel_values, num_patches_list, end_frame)
-        cur_num_patches = num_patches_list[:end_frame]
-        frame_prompt = f"Frame-{end_frame}: <image>\n"
+        samples = interval_samples[interval_idx]
+        sample_count = len(samples["frame_indices"])
+        sample_results = []
 
-        if interval_idx == 0:
-            question = PROACTIVE_TASK_PROMPT.format(query=record["query"]) + frame_prompt
-            response, history = generate_response(
-                model,
-                tokenizer,
-                cur_pixel_values,
-                question,
-                generation_config,
-                cur_num_patches,
-                history=None,
-            )
-            threshold = average_perplexity(
-                model,
-                tokenizer,
-                cur_pixel_values,
-                frame_prompt,
-                generation_config,
-                cur_num_patches,
-                history,
-                check_answer_text(response, args.check_len),
-                self_check=True,
-                num_runs=args.num_runs,
-            )
-            last_response = response
-            pred_label = "interrupt"
-            ppl = threshold
-            decision_threshold = threshold
-        else:
-            ppl = average_perplexity(
-                model,
-                tokenizer,
-                cur_pixel_values,
-                frame_prompt,
-                generation_config,
-                cur_num_patches,
-                history,
-                check_answer_text(last_response, args.check_len),
-                self_check=False,
-                num_runs=args.num_runs,
-            )
-            decision_threshold = threshold * args.alpha
-            if ppl > decision_threshold:
-                response, history = generate_response(
+        for local_sample_idx in range(sample_count):
+            end_sample = sample_cursor + local_sample_idx + 1
+            frame_prompt = make_frame_prompt(end_sample, 1)
+
+            if threshold is None:
+                cur_pixel_values, cur_num_patches = pixel_select(
+                    pixel_values,
+                    num_patches_list,
+                    [end_sample],
+                )
+                question = PROACTIVE_TASK_PROMPT.format(query=record["query"]) + frame_prompt
+                response, _ = generate_response(
                     model,
                     tokenizer,
                     cur_pixel_values,
-                    frame_prompt,
+                    question,
                     generation_config,
                     cur_num_patches,
-                    history,
+                    history=None,
+                )
+                history_entries.append({"frame_ids": [end_sample], "answer": response})
+                (
+                    check_pixel_values,
+                    check_num_patches,
+                    check_history,
+                    context_info,
+                ) = build_chat_inputs(
+                    pixel_values,
+                    num_patches_list,
+                    history_entries,
+                    end_sample,
+                    args,
+                    record["query"],
+                    self_check=True,
                 )
                 threshold = average_perplexity(
                     model,
                     tokenizer,
-                    cur_pixel_values,
+                    check_pixel_values,
                     frame_prompt,
                     generation_config,
-                    cur_num_patches,
-                    history,
+                    check_num_patches,
+                    check_history,
                     check_answer_text(response, args.check_len),
                     self_check=True,
                     num_runs=args.num_runs,
                 )
                 last_response = response
-                pred_label = "interrupt"
+                sample_pred_label = "interrupt"
+                ppl = threshold
+                decision_threshold = threshold
             else:
-                response = ""
-                history[-1] = (history[-1][0] + frame_prompt, history[-1][1])
-                pred_label = "silent"
+                (
+                    cur_pixel_values,
+                    cur_num_patches,
+                    cur_history,
+                    context_info,
+                ) = build_chat_inputs(
+                    pixel_values,
+                    num_patches_list,
+                    history_entries,
+                    end_sample,
+                    args,
+                    record["query"],
+                    self_check=False,
+                )
+                ppl = average_perplexity(
+                    model,
+                    tokenizer,
+                    cur_pixel_values,
+                    frame_prompt,
+                    generation_config,
+                    cur_num_patches,
+                    cur_history,
+                    check_answer_text(last_response, args.check_len),
+                    self_check=False,
+                    num_runs=args.num_runs,
+                )
+                decision_threshold = threshold * args.alpha
+                if ppl > decision_threshold:
+                    response, _ = generate_response(
+                        model,
+                        tokenizer,
+                        cur_pixel_values,
+                        frame_prompt,
+                        generation_config,
+                        cur_num_patches,
+                        cur_history,
+                    )
+                    history_entries.append({"frame_ids": [end_sample], "answer": response})
+                    (
+                        check_pixel_values,
+                        check_num_patches,
+                        check_history,
+                        context_info,
+                    ) = build_chat_inputs(
+                        pixel_values,
+                        num_patches_list,
+                        history_entries,
+                        end_sample,
+                        args,
+                        record["query"],
+                        self_check=True,
+                    )
+                    threshold = average_perplexity(
+                        model,
+                        tokenizer,
+                        check_pixel_values,
+                        frame_prompt,
+                        generation_config,
+                        check_num_patches,
+                        check_history,
+                        check_answer_text(response, args.check_len),
+                        self_check=True,
+                        num_runs=args.num_runs,
+                    )
+                    last_response = response
+                    sample_pred_label = "interrupt"
+                else:
+                    response = ""
+                    if history_entries:
+                        history_entries[-1]["frame_ids"].append(end_sample)
+                    else:
+                        history_entries.append({"frame_ids": [end_sample], "answer": ""})
+                    sample_pred_label = "silent"
+
+            sample_results.append(
+                {
+                    "sample_index": end_sample,
+                    "local_sample_index": local_sample_idx,
+                    "frame_index": samples["frame_indices"][local_sample_idx],
+                    "time_sec": samples["frame_times_sec"][local_sample_idx],
+                    "target_time_sec": samples["target_times_sec"][local_sample_idx],
+                    "pred_label": sample_pred_label,
+                    "ppl": ppl,
+                    "decision_threshold": decision_threshold,
+                    "active_threshold": threshold,
+                    "generated_text": response,
+                    "context_history_turns": context_info["history_turns"],
+                    "context_history_frames": context_info["history_frames"],
+                    "context_input_frames": context_info["input_frames"],
+                    "context_first_sample_index": context_info["first_input_sample"],
+                    "context_last_sample_index": context_info["last_input_sample"],
+                }
+            )
 
         gt_label = record["gt_labels"][interval_idx]
+        interrupt_votes = sum(
+            item["pred_label"] == "interrupt" for item in sample_results
+        )
+        pred_label = (
+            "interrupt"
+            if interrupt_votes >= 1
+            else "silent"
+        )
+        generated_texts = [
+            item["generated_text"]
+            for item in sample_results
+            if item["pred_label"] == "interrupt" and item["generated_text"]
+        ]
+        last_sample = sample_results[-1]
+        frame_prompt_start = sample_cursor + 1
+        sample_cursor += sample_count
         interval_results.append(
             {
                 "interval_index": interval_idx,
                 "interval": interval,
-                "representative_frame_index": frame_indices[interval_idx],
-                "representative_time_sec": frame_times[interval_idx],
+                "num_sampled_frames": sample_count,
+                "sampled_frame_indices": samples["frame_indices"],
+                "sampled_times_sec": samples["frame_times_sec"],
+                "target_sample_times_sec": samples["target_times_sec"],
+                "representative_frame_index": samples["frame_indices"][-1],
+                "representative_time_sec": samples["frame_times_sec"][-1],
+                "frame_prompt_start": frame_prompt_start,
+                "frame_prompt_end": sample_cursor,
+                "sample_results": sample_results,
+                "interrupt_votes": interrupt_votes,
+                "silent_votes": len(sample_results) - interrupt_votes,
                 "gt_label": gt_label,
                 "pred_label": pred_label,
                 "correct": pred_label == gt_label,
-                "ppl": ppl,
-                "decision_threshold": decision_threshold,
-                "active_threshold": threshold,
-                "generated_text": response,
+                "ppl": last_sample["ppl"],
+                "decision_threshold": last_sample["decision_threshold"],
+                "active_threshold": last_sample["active_threshold"],
+                "generated_text": " | ".join(generated_texts),
                 "gt_answer": record["gt_answers"][interval_idx],
             }
         )
 
     correct = sum(item["correct"] for item in interval_results)
     return {
+        "sample_order": record.get("sample_order"),
+        "shard_index": getattr(args, "shard_index", -1),
         "video_path": record["video_path"],
         "query": record["query"],
         "domain": record["domain"],
@@ -446,6 +789,7 @@ def evaluate_record(record, model, tokenizer, generation_config, args):
         "interval_accuracy": correct / len(interval_results) if interval_results else 0.0,
         "num_intervals": len(interval_results),
         "interval_results": interval_results,
+        "error": False,
     }
 
 
@@ -467,6 +811,8 @@ def load_model_and_tokenizer(model_dir, device):
 
 
 def update_counts(counts, result):
+    if result.get("error"):
+        return
     for item in result["interval_results"]:
         gt = item["gt_label"]
         pred = item["pred_label"]
@@ -527,12 +873,77 @@ def print_metrics(metrics):
     )
 
 
-def dry_run(records, selected):
+def build_experiment_config(args, generation_config=None, gpus=None, shard_plan=None):
+    return {
+        "protocol": "generated-history SVeD interval classification",
+        "sampling": {
+            "frames_per_interval": args.frames_per_interval,
+            "strategy": "uniform sub-interval centers",
+            "decision_step": "one SVeD decision per sampled frame",
+            "interval_aggregation": "majority=1; interrupt if at least 1 sampled frame interrupts, otherwise silent",
+            "self_check_frame": "current sampled frame",
+        },
+        "context": {
+            "max_context_intervals": args.max_context_intervals,
+            "max_context_frames": args.max_context_frames,
+            "max_history_turns": args.max_history_turns,
+            "frame_selection": "retain the most recent sampled frames and rebuild matching history/image patches",
+            "clear_cache_per_video": args.clear_cache_per_video,
+        },
+        "data": {
+            "ann_file": str(args.ann_file),
+            "video_dir": str(args.video_dir),
+            "num_samples": args.num_samples,
+            "seed": args.seed,
+            "max_intervals_per_video": args.max_intervals_per_video,
+        },
+        "model": {
+            "model_path": str(args.model_path),
+            "weights_dir": str(args.weights_dir),
+            "device": args.device,
+            "gpus": gpus if gpus is not None else parse_gpus(args.gpus),
+        },
+        "execution": {
+            "mode": "multi_gpu" if (gpus if gpus is not None else parse_gpus(args.gpus)) else "single_process",
+            "shard_index": args.shard_index,
+            "total_shards": args.total_shards,
+            "shard_plan": shard_plan or [],
+        },
+        "sved": {
+            "alpha": args.alpha,
+            "num_runs": args.num_runs,
+            "check_len": args.check_len,
+        },
+        "preprocess": {
+            "input_size": args.input_size,
+            "max_num": args.max_num,
+        },
+        "generation": generation_config or {},
+    }
+
+
+def dry_run(records, selected, args):
     label_counts = Counter(label for record in selected for label in record["gt_labels"])
+    total_intervals = sum(len(record["video_intervals"]) for record in selected)
+    gpus = parse_gpus(args.gpus)
     print("== Dry Run ==")
     print(f"usable records : {len(records)}")
     print(f"selected       : {len(selected)}")
+    print(f"intervals      : {total_intervals}")
+    print(f"frames/interval: {args.frames_per_interval}")
+    print(f"max context intervals: {args.max_context_intervals}")
+    print(f"max context frames: {args.max_context_frames}")
+    print(f"max history turns : {args.max_history_turns}")
+    print(f"sampled frames : {total_intervals * max(1, args.frames_per_interval)}")
     print(f"labels         : {dict(label_counts)}")
+    if gpus:
+        shards = shard_records(selected, len(gpus), args.frames_per_interval)
+        print("shards:")
+        for idx, shard in enumerate(shards):
+            print(
+                f"  shard {idx} gpu={gpus[idx]} records={len(shard['records'])} "
+                f"estimated_sampled_frames={shard['work']}"
+            )
     for idx, record in enumerate(selected, 1):
         print(
             f"{idx:02d}. {record['video_path']} | intervals={len(record['video_intervals'])} "
@@ -540,25 +951,17 @@ def dry_run(records, selected):
         )
 
 
-def main():
-    args = parse_args()
-    args.ann_file = resolve_path(args.ann_file, args.data_root)
-    args.video_dir = resolve_path(args.video_dir, args.data_root)
-    args.model_path = resolve_path(args.model_path, REPO_ROOT)
-    args.weights_dir = resolve_path(args.weights_dir)
-    args.output = resolve_path(args.output, REPO_ROOT)
+def make_generation_config(args):
+    return {
+        "temperature": 0.0,
+        "max_new_tokens": args.max_new_tokens,
+        "top_p": 0.1,
+        "num_beams": 1,
+        "repetition_penalty": 1.05,
+    }
 
-    records = load_records(
-        args.ann_file,
-        args.video_dir,
-        max_intervals_per_video=args.max_intervals_per_video,
-    )
-    selected = sample_records(records, args.num_samples, args.seed)
 
-    if args.dry_run:
-        dry_run(records, selected)
-        return
-
+def run_worker(args, selected, experiment_config):
     generation_config = {
         "temperature": 0.0,
         "max_new_tokens": args.max_new_tokens,
@@ -580,24 +983,232 @@ def main():
 
     args.output.parent.mkdir(parents=True, exist_ok=True)
     counts = Counter()
+    failed = Counter()
     with args.output.open("w", encoding="utf-8") as f_out, torch.no_grad():
         for record in tqdm(selected, desc="Evaluating egoproactive"):
-            result = evaluate_record(record, model, tokenizer, generation_config, args)
+            try:
+                result = evaluate_record(record, model, tokenizer, generation_config, args)
+            except Exception as exc:
+                if not is_oom_error(exc):
+                    raise
+                clear_cuda_cache()
+                result = make_error_result(record, args, "oom", exc)
+                failed["oom"] += 1
+                print(
+                    f"{record['video_path']}: OOM skipped; "
+                    f"{result['error_message'][:180]}"
+                )
+            finally:
+                if args.clear_cache_per_video:
+                    clear_cuda_cache()
+            result["experiment_config"] = experiment_config
             update_counts(counts, result)
             json.dump(result, f_out, ensure_ascii=False)
             f_out.write("\n")
             f_out.flush()
-            print(
-                f"{record['video_path']}: interval_acc={result['interval_accuracy']:.4f} "
-                f"({result['num_intervals']} intervals)"
-            )
+            if not result.get("error"):
+                print(
+                    f"{record['video_path']}: interval_acc={result['interval_accuracy']:.4f} "
+                    f"({result['num_intervals']} intervals)"
+                )
 
     metrics = compute_metrics(counts)
     print_metrics(metrics)
+    if failed:
+        print(f"failed records: {dict(failed)}")
     print(f"\nSaved predictions to {args.output}")
 
     if tmp_ctx is not None:
         tmp_ctx.cleanup()
+
+
+def shard_plan_summary(shards, gpus):
+    return [
+        {
+            "shard_index": idx,
+            "gpu": gpus[idx],
+            "records": len(shard["records"]),
+            "estimated_sampled_frames": shard["work"],
+        }
+        for idx, shard in enumerate(shards)
+    ]
+
+
+def build_worker_cmd(args, shard_input, shard_output, shard_index, total_shards):
+    cmd = [
+        sys.executable,
+        str(Path(__file__).resolve()),
+        "--data-root",
+        str(args.data_root),
+        "--ann-file",
+        str(args.ann_file),
+        "--video-dir",
+        str(args.video_dir),
+        "--model-path",
+        str(args.model_path),
+        "--weights-dir",
+        str(args.weights_dir),
+        "--output",
+        str(shard_output),
+        "--num-samples",
+        str(args.num_samples),
+        "--seed",
+        str(args.seed),
+        "--alpha",
+        str(args.alpha),
+        "--num-runs",
+        str(args.num_runs),
+        "--max-new-tokens",
+        str(args.max_new_tokens),
+        "--check-len",
+        str(args.check_len),
+        "--input-size",
+        str(args.input_size),
+        "--max-num",
+        str(args.max_num),
+        "--frames-per-interval",
+        str(args.frames_per_interval),
+        "--max-context-intervals",
+        str(args.max_context_intervals),
+        "--max-context-frames",
+        str(args.max_context_frames),
+        "--max-history-turns",
+        str(args.max_history_turns),
+        "--max-intervals-per-video",
+        str(args.max_intervals_per_video),
+        "--device",
+        args.device,
+        "--gpus",
+        "",
+        "--worker-input",
+        str(shard_input),
+        "--shard-index",
+        str(shard_index),
+        "--total-shards",
+        str(total_shards),
+    ]
+    if args.clear_cache_per_video:
+        cmd.append("--clear-cache-per-video")
+    else:
+        cmd.append("--no-clear-cache-per-video")
+    return cmd
+
+
+def launch_multi_gpu(args, selected, gpus, generation_config):
+    shards = shard_records(selected, len(gpus), args.frames_per_interval)
+    plan = shard_plan_summary(shards, gpus)
+    experiment_config = build_experiment_config(
+        args, generation_config, gpus=gpus, shard_plan=plan
+    )
+    shard_dir = args.output.parent / f"{args.output.stem}_shards"
+    shard_dir.mkdir(parents=True, exist_ok=True)
+
+    processes = []
+    log_handles = []
+    for idx, shard in enumerate(shards):
+        shard_input = shard_dir / f"shard_{idx:02d}_input.jsonl"
+        shard_output = shard_dir / f"shard_{idx:02d}_output.jsonl"
+        shard_log = shard_dir / f"shard_{idx:02d}.log"
+        write_records_jsonl(shard_input, shard["records"])
+        cmd = build_worker_cmd(args, shard_input, shard_output, idx, len(shards))
+        env = os.environ.copy()
+        env["CUDA_VISIBLE_DEVICES"] = gpus[idx]
+        log_f = shard_log.open("w", encoding="utf-8")
+        log_handles.append(log_f)
+        print(
+            f"Launching shard {idx} on GPU {gpus[idx]}: "
+            f"{len(shard['records'])} records, {shard['work']} sampled frames"
+        )
+        processes.append(
+            {
+                "index": idx,
+                "output": shard_output,
+                "log": shard_log,
+                "process": subprocess.Popen(
+                    cmd,
+                    stdout=log_f,
+                    stderr=subprocess.STDOUT,
+                    env=env,
+                    cwd=str(REPO_ROOT),
+                ),
+            }
+        )
+
+    failed = []
+    for item in processes:
+        returncode = item["process"].wait()
+        if returncode != 0:
+            failed.append((item["index"], returncode, item["log"]))
+    for handle in log_handles:
+        handle.close()
+
+    if failed:
+        for shard_index, returncode, log_path in failed:
+            print(f"Shard {shard_index} failed with code {returncode}. Log: {log_path}")
+        raise RuntimeError("One or more evaluation shards failed.")
+
+    merged = []
+    for item in processes:
+        for result in read_records_jsonl(item["output"]):
+            result["experiment_config"] = experiment_config
+            merged.append(result)
+    merged.sort(key=lambda item: item.get("sample_order", 0))
+
+    counts = Counter()
+    args.output.parent.mkdir(parents=True, exist_ok=True)
+    with args.output.open("w", encoding="utf-8") as f_out:
+        for result in merged:
+            update_counts(counts, result)
+            json.dump(result, f_out, ensure_ascii=False)
+            f_out.write("\n")
+
+    metrics = compute_metrics(counts)
+    print_metrics(metrics)
+    print(f"\nSaved merged predictions to {args.output}")
+    print(f"Shard logs and outputs are in {shard_dir}")
+
+
+def resolve_args(args):
+    args.data_root = resolve_path(args.data_root)
+    args.ann_file = resolve_path(args.ann_file, args.data_root)
+    args.video_dir = resolve_path(args.video_dir, args.data_root)
+    args.model_path = resolve_path(args.model_path, REPO_ROOT)
+    args.weights_dir = resolve_path(args.weights_dir)
+    args.output = resolve_path(args.output, REPO_ROOT)
+    if args.max_context_frames <= 0 and args.max_context_intervals > 0:
+        args.max_context_frames = (
+            max(1, int(args.frames_per_interval)) * int(args.max_context_intervals)
+        )
+    if args.worker_input is not None:
+        args.worker_input = resolve_path(args.worker_input, REPO_ROOT)
+    return args
+
+
+def main():
+    args = resolve_args(parse_args())
+
+    if args.worker_input is not None:
+        selected = read_records_jsonl(args.worker_input)
+    else:
+        records = load_records(
+            args.ann_file,
+            args.video_dir,
+            max_intervals_per_video=args.max_intervals_per_video,
+        )
+        selected = attach_sample_order(sample_records(records, args.num_samples, args.seed))
+
+    if args.dry_run:
+        dry_run(records if args.worker_input is None else selected, selected, args)
+        return
+
+    generation_config = make_generation_config(args)
+    gpus = parse_gpus(args.gpus)
+    if gpus and args.worker_input is None:
+        launch_multi_gpu(args, selected, gpus, generation_config)
+        return
+
+    experiment_config = build_experiment_config(args, generation_config, gpus=gpus)
+    run_worker(args, selected, experiment_config)
 
 
 if __name__ == "__main__":
