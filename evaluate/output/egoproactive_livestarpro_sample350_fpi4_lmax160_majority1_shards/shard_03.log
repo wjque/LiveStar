@@ -1,0 +1,79 @@
+Special tokens have been added in the vocabulary, make sure the associated word embeddings are fine-tuned or trained.
+Model dir: /tmp/livestar_eval_model_hdr6s6pu
+Loading checkpoint shards:   0%|          | 0/4 [00:00<?, ?it/s]Loading checkpoint shards:  25%|██▌       | 1/4 [00:03<00:09,  3.17s/it]Loading checkpoint shards:  50%|█████     | 2/4 [00:04<00:04,  2.27s/it]Loading checkpoint shards:  75%|███████▌  | 3/4 [00:06<00:01,  2.00s/it]Loading checkpoint shards: 100%|██████████| 4/4 [00:06<00:00,  1.39s/it]Loading checkpoint shards: 100%|██████████| 4/4 [00:06<00:00,  1.74s/it]
+Evaluating egoproactive with LiveStarPro:   0%|          | 0/88 [00:00<?, ?it/s]/home/quewenjun/miniconda3/envs/LiveStar/lib/python3.9/site-packages/transformers/generation/configuration_utils.py:392: UserWarning: `do_sample` is set to `False`. However, `temperature` is set to `0.0` -- this flag is only used in sample-based generation modes. You should set `do_sample=True` or unset `temperature`.
+  warnings.warn(
+/home/quewenjun/miniconda3/envs/LiveStar/lib/python3.9/site-packages/transformers/generation/configuration_utils.py:397: UserWarning: `do_sample` is set to `False`. However, `top_p` is set to `0.1` -- this flag is only used in sample-based generation modes. You should set `do_sample=True` or unset `top_p`.
+  warnings.warn(
+Evaluating egoproactive with LiveStarPro:   1%|          | 1/88 [00:13<20:00, 13.80s/it]Evaluating egoproactive with LiveStarPro:   2%|▏         | 2/88 [00:34<25:54, 18.08s/it]Evaluating egoproactive with LiveStarPro:   3%|▎         | 3/88 [01:06<34:11, 24.13s/it]Evaluating egoproactive with LiveStarPro:   5%|▍         | 4/88 [01:34<36:12, 25.86s/it]Evaluating egoproactive with LiveStarPro:   6%|▌         | 5/88 [01:54<32:53, 23.78s/it]Evaluating egoproactive with LiveStarPro:   7%|▋         | 6/88 [02:27<36:50, 26.96s/it]Evaluating egoproactive with LiveStarPro:   8%|▊         | 7/88 [02:52<35:22, 26.20s/it]Evaluating egoproactive with LiveStarPro:   9%|▉         | 8/88 [03:18<34:49, 26.11s/it]Evaluating egoproactive with LiveStarPro:  10%|█         | 9/88 [03:49<36:16, 27.55s/it]Evaluating egoproactive with LiveStarPro:  11%|█▏        | 10/88 [04:08<32:39, 25.13s/it]Evaluating egoproactive with LiveStarPro:  12%|█▎        | 11/88 [04:39<34:16, 26.71s/it]Evaluating egoproactive with LiveStarPro:  14%|█▎        | 12/88 [04:56<30:20, 23.95s/it]Evaluating egoproactive with LiveStarPro:  15%|█▍        | 13/88 [05:09<25:32, 20.44s/it]Evaluating egoproactive with LiveStarPro:  16%|█▌        | 14/88 [05:26<23:56, 19.42s/it]Evaluating egoproactive with LiveStarPro:  17%|█▋        | 15/88 [05:50<25:14, 20.74s/it]Evaluating egoproactive with LiveStarPro:  18%|█▊        | 16/88 [06:16<27:01, 22.52s/it]Evaluating egoproactive with LiveStarPro:  19%|█▉        | 17/88 [06:30<23:34, 19.92s/it]Evaluating egoproactive with LiveStarPro:  20%|██        | 18/88 [06:45<21:37, 18.53s/it]Evaluating egoproactive with LiveStarPro:  22%|██▏       | 19/88 [07:26<28:57, 25.18s/it]Evaluating egoproactive with LiveStarPro:  22%|██▏       | 19/88 [07:43<28:02, 24.38s/it]
+2b640c18d4231b9b.mp4: interval_acc=0.6000 (10 intervals)
+5ffb0890d41b657b.mp4: interval_acc=0.6000 (10 intervals)
+9d573b5e8e238353.mp4: interval_acc=0.5909 (22 intervals)
+2590c2cacdf4a6c2.mp4: interval_acc=0.5000 (16 intervals)
+543fa79dc714ad88.mp4: interval_acc=0.3333 (12 intervals)
+554e251921df992c.mp4: interval_acc=0.6667 (18 intervals)
+a74dd55533702e91.mp4: interval_acc=0.5000 (16 intervals)
+ddd45588155515b7.mp4: interval_acc=0.5000 (20 intervals)
+01cf3744ff905bae.mp4: interval_acc=0.6000 (15 intervals)
+7f1c64f7d0880938.mp4: interval_acc=0.5000 (8 intervals)
+908edba416baccfe.mp4: interval_acc=0.4286 (14 intervals)
+26694a16b3f352ec.mp4: interval_acc=0.7000 (10 intervals)
+d1b4bd88ef655ac6.mp4: interval_acc=0.5000 (6 intervals)
+875bff219f6b77f2.mp4: interval_acc=0.4000 (10 intervals)
+714405de0f91efad.mp4: interval_acc=0.5000 (12 intervals)
+289f6d9790c6b736.mp4: interval_acc=0.3125 (16 intervals)
+8b21e98023cef25d.mp4: interval_acc=0.6667 (12 intervals)
+e3b63c11a7c9e0ab.mp4: interval_acc=0.5000 (12 intervals)
+42273b360ba21855.mp4: interval_acc=0.5909 (22 intervals)
+Traceback (most recent call last):
+  File "/home/quewenjun/workspace/proactive_vlm/LiveStar/evaluate/eval_proactive_pro.py", line 876, in <module>
+    main()
+  File "/home/quewenjun/workspace/proactive_vlm/LiveStar/evaluate/eval_proactive_pro.py", line 872, in main
+    run_worker(args, selected, experiment_config)
+  File "/home/quewenjun/workspace/proactive_vlm/LiveStar/evaluate/eval_proactive_pro.py", line 651, in run_worker
+    result = evaluate_record(record, model, tokenizer, generation_config, args)
+  File "/home/quewenjun/workspace/proactive_vlm/LiveStar/evaluate/eval_proactive_pro.py", line 436, in evaluate_record
+    decision = session.process_sample(sample_id)
+  File "/home/quewenjun/workspace/proactive_vlm/LiveStar/evaluate/eval_proactive_pro.py", line 299, in process_sample
+    return self._step_sample(sample_id)
+  File "/home/quewenjun/workspace/proactive_vlm/LiveStar/evaluate/eval_proactive_pro.py", line 343, in _step_sample
+    response, _ = self._generate(sample_id, recall)
+  File "/home/quewenjun/workspace/proactive_vlm/LiveStar/evaluate/eval_proactive_pro.py", line 230, in _generate
+    response, _, _ = self.model.chat(
+  File "/home/quewenjun/.cache/huggingface/modules/transformers_modules/livestar_eval_model_hdr6s6pu/modeling_livestar_chat.py", line 683, in chat
+    generation_output, new_past_key_values = self.generate(
+  File "/home/quewenjun/miniconda3/envs/LiveStar/lib/python3.9/site-packages/torch/utils/_contextlib.py", line 116, in decorate_context
+    return func(*args, **kwargs)
+  File "/home/quewenjun/.cache/huggingface/modules/transformers_modules/livestar_eval_model_hdr6s6pu/modeling_livestar_chat.py", line 743, in generate
+    outputs, new_past_key_values = self.language_model.generate(
+  File "/home/quewenjun/miniconda3/envs/LiveStar/lib/python3.9/site-packages/torch/utils/_contextlib.py", line 116, in decorate_context
+    return func(*args, **kwargs)
+  File "/home/quewenjun/.cache/huggingface/modules/transformers_modules/livestar_eval_model_hdr6s6pu/modeling_livestar_llm.py", line 1239, in generate
+    return self.greedy_search(
+  File "/home/quewenjun/.cache/huggingface/modules/transformers_modules/livestar_eval_model_hdr6s6pu/modeling_livestar_llm.py", line 1311, in greedy_search
+    outputs = self(
+  File "/home/quewenjun/miniconda3/envs/LiveStar/lib/python3.9/site-packages/torch/nn/modules/module.py", line 1736, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/home/quewenjun/miniconda3/envs/LiveStar/lib/python3.9/site-packages/torch/nn/modules/module.py", line 1747, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/home/quewenjun/.cache/huggingface/modules/transformers_modules/livestar_eval_model_hdr6s6pu/modeling_livestar_llm.py", line 1449, in forward
+    outputs = self.model(
+  File "/home/quewenjun/miniconda3/envs/LiveStar/lib/python3.9/site-packages/torch/nn/modules/module.py", line 1736, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/home/quewenjun/miniconda3/envs/LiveStar/lib/python3.9/site-packages/torch/nn/modules/module.py", line 1747, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/home/quewenjun/.cache/huggingface/modules/transformers_modules/livestar_eval_model_hdr6s6pu/modeling_livestar_llm.py", line 1008, in forward
+    layer_outputs = decoder_layer(
+  File "/home/quewenjun/miniconda3/envs/LiveStar/lib/python3.9/site-packages/torch/nn/modules/module.py", line 1736, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/home/quewenjun/miniconda3/envs/LiveStar/lib/python3.9/site-packages/torch/nn/modules/module.py", line 1747, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/home/quewenjun/.cache/huggingface/modules/transformers_modules/livestar_eval_model_hdr6s6pu/modeling_livestar_llm.py", line 722, in forward
+    hidden_states = self.ffn_norm(hidden_states)
+  File "/home/quewenjun/miniconda3/envs/LiveStar/lib/python3.9/site-packages/torch/nn/modules/module.py", line 1736, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/home/quewenjun/miniconda3/envs/LiveStar/lib/python3.9/site-packages/torch/nn/modules/module.py", line 1747, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/home/quewenjun/.cache/huggingface/modules/transformers_modules/livestar_eval_model_hdr6s6pu/modeling_livestar_llm.py", line 196, in forward
+    return self.weight * hidden_states.to(input_dtype)
+KeyboardInterrupt

@@ -1,0 +1,42 @@
+Special tokens have been added in the vocabulary, make sure the associated word embeddings are fine-tuned or trained.
+Model dir: /tmp/livestar_eval_model_idipwzfk
+Loading checkpoint shards:   0%|          | 0/4 [00:00<?, ?it/s]Loading checkpoint shards:  25%|██▌       | 1/4 [00:01<00:04,  1.52s/it]Loading checkpoint shards:  50%|█████     | 2/4 [00:03<00:03,  1.59s/it]Loading checkpoint shards:  75%|███████▌  | 3/4 [00:04<00:01,  1.48s/it]Loading checkpoint shards: 100%|██████████| 4/4 [00:04<00:00,  1.07s/it]Loading checkpoint shards: 100%|██████████| 4/4 [00:04<00:00,  1.24s/it]
+Evaluating egoproactive with LiveStarPro:   0%|          | 0/87 [00:00<?, ?it/s]/home/quewenjun/miniconda3/envs/LiveStar/lib/python3.9/site-packages/transformers/generation/configuration_utils.py:392: UserWarning: `do_sample` is set to `False`. However, `temperature` is set to `0.0` -- this flag is only used in sample-based generation modes. You should set `do_sample=True` or unset `temperature`.
+  warnings.warn(
+/home/quewenjun/miniconda3/envs/LiveStar/lib/python3.9/site-packages/transformers/generation/configuration_utils.py:397: UserWarning: `do_sample` is set to `False`. However, `top_p` is set to `0.1` -- this flag is only used in sample-based generation modes. You should set `do_sample=True` or unset `top_p`.
+  warnings.warn(
+Evaluating egoproactive with LiveStarPro:   1%|          | 1/87 [00:23<33:42, 23.52s/it]Evaluating egoproactive with LiveStarPro:   2%|▏         | 2/87 [00:47<34:01, 24.02s/it]Evaluating egoproactive with LiveStarPro:   3%|▎         | 3/87 [01:07<30:57, 22.11s/it]Evaluating egoproactive with LiveStarPro:   5%|▍         | 4/87 [01:29<30:12, 21.84s/it]Evaluating egoproactive with LiveStarPro:   6%|▌         | 5/87 [02:05<36:53, 26.99s/it]Evaluating egoproactive with LiveStarPro:   7%|▋         | 6/87 [02:27<34:23, 25.48s/it]Evaluating egoproactive with LiveStarPro:   8%|▊         | 7/87 [02:51<33:05, 24.82s/it]Evaluating egoproactive with LiveStarPro:   9%|▉         | 8/87 [03:12<31:20, 23.81s/it]Evaluating egoproactive with LiveStarPro:  10%|█         | 9/87 [03:37<31:04, 23.90s/it]Evaluating egoproactive with LiveStarPro:  11%|█▏        | 10/87 [04:12<35:23, 27.58s/it]Evaluating egoproactive with LiveStarPro:  13%|█▎        | 11/87 [04:35<32:53, 25.97s/it]Evaluating egoproactive with LiveStarPro:  14%|█▍        | 12/87 [04:53<29:36, 23.68s/it]Evaluating egoproactive with LiveStarPro:  15%|█▍        | 13/87 [05:46<40:11, 32.59s/it]Evaluating egoproactive with LiveStarPro:  16%|█▌        | 14/87 [06:58<54:04, 44.44s/it]Evaluating egoproactive with LiveStarPro:  17%|█▋        | 15/87 [07:25<47:05, 39.25s/it]Evaluating egoproactive with LiveStarPro:  18%|█▊        | 16/87 [07:41<38:02, 32.15s/it]Evaluating egoproactive with LiveStarPro:  18%|█▊        | 16/87 [07:44<34:22, 29.06s/it]
+08b9fac1a8faa178.mp4: interval_acc=0.5455 (11 intervals)
+6c9b422d68c5645b.mp4: interval_acc=0.5000 (12 intervals)
+357949b303371403.mp4: interval_acc=0.5556 (9 intervals)
+22c5e8b47498a505.mp4: interval_acc=0.4000 (10 intervals)
+59f325da8667be52.mp4: interval_acc=0.5455 (22 intervals)
+09608c5b07b02b7d.mp4: interval_acc=0.5000 (16 intervals)
+d47ac5d6cd4d6279.mp4: interval_acc=0.6667 (12 intervals)
+f4c33329955a5e7f.mp4: interval_acc=0.6667 (18 intervals)
+3e26e67e42c74a1f.mp4: interval_acc=0.6250 (16 intervals)
+fdcb8a3482770355.mp4: interval_acc=0.5500 (20 intervals)
+86050eb539e421ca.mp4: interval_acc=0.2667 (15 intervals)
+80efe6b804a726fd.mp4: interval_acc=0.6429 (14 intervals)
+6a91080d816fc652.mp4: interval_acc=0.5556 (18 intervals)
+ccb5d74c42da3d7d.mp4: interval_acc=0.5000 (28 intervals)
+318b4556ebf846e5.mp4: interval_acc=0.3846 (13 intervals)
+9073c7bf35446446.mp4: interval_acc=0.5000 (10 intervals)
+Traceback (most recent call last):
+  File "/home/quewenjun/workspace/proactive_vlm/LiveStar/evaluate/eval_proactive_pro.py", line 876, in <module>
+    main()
+  File "/home/quewenjun/workspace/proactive_vlm/LiveStar/evaluate/eval_proactive_pro.py", line 872, in main
+    run_worker(args, selected, experiment_config)
+  File "/home/quewenjun/workspace/proactive_vlm/LiveStar/evaluate/eval_proactive_pro.py", line 651, in run_worker
+    result = evaluate_record(record, model, tokenizer, generation_config, args)
+  File "/home/quewenjun/workspace/proactive_vlm/LiveStar/evaluate/eval_proactive_pro.py", line 407, in evaluate_record
+    pixel_values, num_patches_list, interval_samples = base.load_interval_frames(
+  File "/home/quewenjun/workspace/proactive_vlm/LiveStar/evaluate/eval_proactive.py", line 343, in load_interval_frames
+    image = Image.fromarray(vr[frame_idx].asnumpy()).convert("RGB")
+  File "/home/quewenjun/miniconda3/envs/LiveStar/lib/python3.9/site-packages/decord/video_reader.py", line 104, in __getitem__
+    self.seek_accurate(idx)
+  File "/home/quewenjun/miniconda3/envs/LiveStar/lib/python3.9/site-packages/decord/video_reader.py", line 232, in seek_accurate
+    success = _CAPI_VideoReaderSeekAccurate(self._handle, pos)
+  File "/home/quewenjun/miniconda3/envs/LiveStar/lib/python3.9/site-packages/decord/_ffi/_ctypes/function.py", line 173, in __call__
+    check_call(_LIB.DECORDFuncCall(
+KeyboardInterrupt

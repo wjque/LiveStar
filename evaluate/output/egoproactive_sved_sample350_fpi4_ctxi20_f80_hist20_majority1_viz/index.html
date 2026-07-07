@@ -1,0 +1,1225 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Egoproactive SVeD Visualization</title>
+  <style>
+    :root {
+      --bg: #f6f8fb;
+      --panel: #ffffff;
+      --text: #1f2933;
+      --muted: #667085;
+      --border: #d9e2ec;
+      --interrupt: #d95f02;
+      --silent: #1b9e77;
+      --error: #e7298a;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font: 14px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+    main { max-width: 1180px; margin: 0 auto; padding: 28px 18px 52px; }
+    h1 { margin: 0 0 6px; font-size: 28px; }
+    h2 { margin: 24px 0 12px; font-size: 18px; }
+    .source { color: var(--muted); margin-bottom: 18px; }
+    .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; margin: 18px 0; }
+    .card {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 14px;
+    }
+    .card-label { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .04em; }
+    .card-value { font-size: 24px; font-weight: 700; margin-top: 4px; }
+    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 14px;
+      overflow: auto;
+    }
+    svg { width: 100%; height: auto; }
+    .svg-title { font-size: 18px; font-weight: 700; fill: var(--text); }
+    .svg-axis { font-size: 13px; fill: var(--text); }
+    .svg-muted { font-size: 12px; fill: var(--muted); }
+    .svg-count { font-size: 30px; font-weight: 800; fill: #0f172a; }
+    .legend { display: flex; gap: 16px; color: var(--muted); margin: 8px 0 16px; }
+    .legend span::before {
+      content: "";
+      display: inline-block;
+      width: 12px;
+      height: 12px;
+      border-radius: 3px;
+      margin-right: 6px;
+      vertical-align: -1px;
+    }
+    .legend .interrupt::before { background: var(--interrupt); }
+    .legend .silent::before { background: var(--silent); }
+    .legend .wrong::before { background: var(--error); }
+    .domain-table, .config-table { width: 100%; border-collapse: collapse; }
+    .domain-table td, .domain-table th, .config-table td, .config-table th {
+      border-bottom: 1px solid var(--border);
+      padding: 8px;
+      text-align: left;
+    }
+    .config-table th { width: 220px; color: var(--muted); }
+    .empty-note { color: var(--muted); }
+    .video-section {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      margin: 14px 0;
+      overflow: hidden;
+    }
+    summary {
+      cursor: pointer;
+      padding: 12px 14px;
+      font-weight: 700;
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+    }
+    .summary-meta { color: var(--muted); font-weight: 500; }
+    .video-meta { padding: 0 14px 10px; color: var(--muted); }
+    .video-player { display: block; width: min(720px, calc(100% - 28px)); max-height: 420px; margin: 0 14px 12px; background: #000; border-radius: 8px; }
+    .timeline { padding: 0 12px; }
+    .table-wrap { overflow-x: auto; padding: 0 14px 14px; }
+    table { width: 100%; border-collapse: collapse; min-width: 1120px; }
+    th, td { border-top: 1px solid var(--border); padding: 7px 8px; vertical-align: top; text-align: left; }
+    th { background: #f8fafc; font-size: 12px; color: var(--muted); }
+    tr.bad td { background: #fff5f8; }
+    .pill {
+      display: inline-block;
+      min-width: 66px;
+      text-align: center;
+      padding: 2px 7px;
+      border-radius: 999px;
+      color: #fff;
+      font-size: 12px;
+      font-weight: 700;
+    }
+    .pill.interrupt { background: var(--interrupt); }
+    .pill.silent { background: var(--silent); }
+    @media (max-width: 900px) {
+      .cards { grid-template-columns: repeat(2, 1fr); }
+      .grid { grid-template-columns: 1fr; }
+      summary { display: block; }
+      .summary-meta { display: block; margin-top: 4px; }
+    }
+  </style>
+</head>
+<body>
+<main>
+  <h1>Egoproactive SVeD Visualization</h1>
+  <div class="source">Source: /home/quewenjun/workspace/proactive_vlm/LiveStar/evaluate/output/egoproactive_sved_sample350_fpi4_ctxi20_f80_hist20_majority1.jsonl</div>
+  <div class="cards"><div class="card"><div class="card-label">Input Videos</div><div class="card-value">350</div></div>
+<div class="card"><div class="card-label">Evaluated</div><div class="card-value">350</div></div>
+<div class="card"><div class="card-label">Failed</div><div class="card-value">0</div></div>
+<div class="card"><div class="card-label">Intervals</div><div class="card-value">4948</div></div>
+<div class="card"><div class="card-label">Accuracy</div><div class="card-value">54.7%</div></div>
+<div class="card"><div class="card-label">Interrupt F1</div><div class="card-value">53.4%</div></div>
+<div class="card"><div class="card-label">Silent F1</div><div class="card-value">56.0%</div></div>
+<div class="card"><div class="card-label">Frames / Interval</div><div class="card-value">4</div></div></div>
+
+  <h2>Experiment Config</h2>
+  <div class="panel">
+    <table class="config-table">
+      <tbody><tr><th>Protocol</th><td>generated-history SVeD interval classification</td></tr>
+<tr><th>Frames per interval</th><td>4</td></tr>
+<tr><th>Sampling strategy</th><td>uniform sub-interval centers</td></tr>
+<tr><th>Decision step</th><td>one SVeD decision per sampled frame</td></tr>
+<tr><th>Interval aggregation</th><td>majority=1; interrupt if at least 1 sampled frame interrupts, otherwise silent</td></tr>
+<tr><th>Self-check frame</th><td>current sampled frame</td></tr>
+<tr><th>Max context intervals</th><td>20</td></tr>
+<tr><th>Max context frames</th><td>80</td></tr>
+<tr><th>Max history turns</th><td>20</td></tr>
+<tr><th>Context frame selection</th><td>retain the most recent sampled frames and rebuild matching history/image patches</td></tr>
+<tr><th>Clear cache per video</th><td>True</td></tr>
+<tr><th>Num samples</th><td>350</td></tr>
+<tr><th>Seed</th><td>42</td></tr>
+<tr><th>Alpha</th><td>1.06</td></tr>
+<tr><th>Num runs</th><td>5</td></tr>
+<tr><th>Max new tokens</th><td>384</td></tr>
+<tr><th>Input size</th><td>448</td></tr>
+<tr><th>Model path</th><td>/home/quewenjun/workspace/proactive_vlm/LiveStar/inference</td></tr>
+<tr><th>Weights dir</th><td>/data1/LiveStar_8B</td></tr>
+<tr><th>Annotation file</th><td>/data1/wearable_ai_challenge_data/egoproactive/wearable_ai_2026_egoproactive_val_700.jsonl</td></tr>
+<tr><th>Video dir</th><td>/data1/wearable_ai_challenge_data/egoproactive/val</td></tr></tbody>
+    </table>
+  </div>
+
+  <h2>Summary</h2>
+  <div class="legend">
+    <span class="interrupt">interrupt</span>
+    <span class="silent">silent</span>
+    <span class="wrong">wrong prediction outline / row</span>
+  </div>
+  <div class="grid">
+    <div class="panel"><svg viewBox="0 0 620 360" role="img" aria-label="Confusion matrix">
+<text x="350" y="28" text-anchor="middle" class="svg-title">Confusion Matrix</text>
+<text x="350" y="55" text-anchor="middle" class="svg-muted">Predicted label</text>
+<text x="80" y="185" text-anchor="middle" class="svg-muted" transform="rotate(-90 80 185)">Ground truth</text>
+<text x="280.0" y="92" text-anchor="middle" class="svg-axis">interrupt</text>
+<text x="460.0" y="92" text-anchor="middle" class="svg-axis">silent</text>
+<text x="170" y="133.0" text-anchor="end" class="svg-axis">interrupt</text>
+<text x="170" y="238.0" text-anchor="end" class="svg-axis">silent</text>
+<rect x="190" y="105" width="172" height="97" rx="6" fill="rgba(37, 99, 235, 0.768)" stroke="#cbd5e1"/>
+<title>GT interrupt / Pred interrupt: 1282</title>
+<text x="276.0" y="149" text-anchor="middle" class="svg-count">1282</text>
+<text x="276.0" y="177" text-anchor="middle" class="svg-muted">Pred interrupt</text>
+<rect x="370" y="105" width="172" height="97" rx="6" fill="rgba(37, 99, 235, 0.814)" stroke="#cbd5e1"/>
+<title>GT interrupt / Pred silent: 1373</title>
+<text x="456.0" y="149" text-anchor="middle" class="svg-count">1373</text>
+<text x="456.0" y="177" text-anchor="middle" class="svg-muted">Pred silent</text>
+<rect x="190" y="210" width="172" height="97" rx="6" fill="rgba(37, 99, 235, 0.559)" stroke="#cbd5e1"/>
+<title>GT silent / Pred interrupt: 868</title>
+<text x="276.0" y="254" text-anchor="middle" class="svg-count">868</text>
+<text x="276.0" y="282" text-anchor="middle" class="svg-muted">Pred interrupt</text>
+<rect x="370" y="210" width="172" height="97" rx="6" fill="rgba(37, 99, 235, 0.840)" stroke="#cbd5e1"/>
+<title>GT silent / Pred silent: 1425</title>
+<text x="456.0" y="254" text-anchor="middle" class="svg-count">1425</text>
+<text x="456.0" y="282" text-anchor="middle" class="svg-muted">Pred silent</text>
+</svg></div>
+    <div class="panel"><svg viewBox="0 0 820 330" role="img" aria-label="Metric bars">
+<text x="410" y="26" text-anchor="middle" class="svg-title">Aggregate Metrics</text>
+<line x1="170.0" y1="40" x2="170.0" y2="300" stroke="#d8dee9"/>
+<text x="170.0" y="324" text-anchor="middle" class="svg-muted">0%</text>
+<line x1="310.0" y1="40" x2="310.0" y2="300" stroke="#d8dee9"/>
+<text x="310.0" y="324" text-anchor="middle" class="svg-muted">25%</text>
+<line x1="450.0" y1="40" x2="450.0" y2="300" stroke="#d8dee9"/>
+<text x="450.0" y="324" text-anchor="middle" class="svg-muted">50%</text>
+<line x1="590.0" y1="40" x2="590.0" y2="300" stroke="#d8dee9"/>
+<text x="590.0" y="324" text-anchor="middle" class="svg-muted">75%</text>
+<line x1="730.0" y1="40" x2="730.0" y2="300" stroke="#d8dee9"/>
+<text x="730.0" y="324" text-anchor="middle" class="svg-muted">100%</text>
+<text x="158" y="65" text-anchor="end" class="svg-axis">Overall Acc</text>
+<rect x="170" y="48" width="560" height="24" rx="5" fill="#eef2f7"/>
+<rect x="170" y="48" width="306.37025060630555" height="24" rx="5" fill="#2563eb"/>
+<text x="742" y="65" class="svg-axis">54.7%</text>
+<text x="158" y="101" text-anchor="end" class="svg-axis">Int Precision</text>
+<rect x="170" y="84" width="560" height="24" rx="5" fill="#eef2f7"/>
+<rect x="170" y="84" width="333.9162790697674" height="24" rx="5" fill="#d95f02"/>
+<text x="742" y="101" class="svg-axis">59.6%</text>
+<text x="158" y="137" text-anchor="end" class="svg-axis">Int Recall</text>
+<rect x="170" y="120" width="560" height="24" rx="5" fill="#eef2f7"/>
+<rect x="170" y="120" width="270.4030131826742" height="24" rx="5" fill="#d95f02"/>
+<text x="742" y="137" class="svg-axis">48.3%</text>
+<text x="158" y="173" text-anchor="end" class="svg-axis">Int F1</text>
+<rect x="170" y="156" width="560" height="24" rx="5" fill="#eef2f7"/>
+<rect x="170" y="156" width="298.82206035379807" height="24" rx="5" fill="#d95f02"/>
+<text x="742" y="173" class="svg-axis">53.4%</text>
+<text x="158" y="209" text-anchor="end" class="svg-axis">Sil Precision</text>
+<rect x="170" y="192" width="560" height="24" rx="5" fill="#eef2f7"/>
+<rect x="170" y="192" width="285.20371694067194" height="24" rx="5" fill="#1b9e77"/>
+<text x="742" y="209" class="svg-axis">50.9%</text>
+<text x="158" y="245" text-anchor="end" class="svg-axis">Sil Recall</text>
+<rect x="170" y="228" width="560" height="24" rx="5" fill="#eef2f7"/>
+<rect x="170" y="228" width="348.015699956389" height="24" rx="5" fill="#1b9e77"/>
+<text x="742" y="245" class="svg-axis">62.1%</text>
+<text x="158" y="281" text-anchor="end" class="svg-axis">Sil F1</text>
+<rect x="170" y="264" width="560" height="24" rx="5" fill="#eef2f7"/>
+<rect x="170" y="264" width="313.49440188568065" height="24" rx="5" fill="#1b9e77"/>
+<text x="742" y="281" class="svg-axis">56.0%</text>
+</svg></div>
+    <div class="panel"><svg viewBox="0 0 620 260" role="img" aria-label="Label distribution">
+<text x="310" y="26" text-anchor="middle" class="svg-title">Label Distribution</text>
+<text x="70" y="80" text-anchor="middle" class="svg-axis">GT</text>
+<text x="138" y="79" text-anchor="end" class="svg-axis">interrupt</text>
+<rect x="150" y="56" width="360" height="34" rx="5" fill="#eef2f7"/>
+<rect x="150" y="56" width="341.6011436740529" height="34" rx="5" fill="#d95f02"/>
+<text x="499.6011436740529" y="79" class="svg-axis">2655</text>
+<text x="138" y="121" text-anchor="end" class="svg-axis">silent</text>
+<rect x="150" y="98" width="360" height="34" rx="5" fill="#eef2f7"/>
+<rect x="150" y="98" width="295.02501786990706" height="34" rx="5" fill="#1b9e77"/>
+<text x="453.02501786990706" y="121" class="svg-axis">2293</text>
+<text x="70" y="166" text-anchor="middle" class="svg-axis">Pred</text>
+<text x="138" y="165" text-anchor="end" class="svg-axis">interrupt</text>
+<rect x="150" y="142" width="360" height="34" rx="5" fill="#eef2f7"/>
+<rect x="150" y="142" width="276.62616154396" height="34" rx="5" fill="#d95f02"/>
+<text x="434.62616154396" y="165" class="svg-axis">2150</text>
+<text x="138" y="207" text-anchor="end" class="svg-axis">silent</text>
+<rect x="150" y="184" width="360" height="34" rx="5" fill="#eef2f7"/>
+<rect x="150" y="184" width="360.0" height="34" rx="5" fill="#1b9e77"/>
+<text x="518.0" y="207" class="svg-axis">2798</text>
+</svg></div>
+    <div class="panel">
+      <h2 style="margin-top:0">Domain Accuracy</h2>
+      <table class="domain-table">
+        <thead><tr><th>Domain</th><th>Correct</th><th>Total</th><th>Accuracy</th></tr></thead>
+        <tbody><tr><td>Arts and Crafts</td><td>690</td><td>1261</td><td>54.7%</td></tr>
+<tr><td>Chef</td><td>770</td><td>1423</td><td>54.1%</td></tr>
+<tr><td>Handyman</td><td>572</td><td>1009</td><td>56.7%</td></tr>
+<tr><td>Tutorial</td><td>675</td><td>1255</td><td>53.8%</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+
+  <h2>Per-video Accuracy</h2>
+  <div class="panel"><svg viewBox="0 0 980 372" role="img" aria-label="Per-video accuracy">
+<text x="490" y="24" text-anchor="middle" class="svg-title">Worst Per-video Macro-F1</text>
+<line x1="260.0" y1="42" x2="260.0" y2="348" stroke="#d8dee9"/>
+<text x="260.0" y="366" text-anchor="middle" class="svg-muted">0%</text>
+<line x1="400.0" y1="42" x2="400.0" y2="348" stroke="#d8dee9"/>
+<text x="400.0" y="366" text-anchor="middle" class="svg-muted">25%</text>
+<line x1="540.0" y1="42" x2="540.0" y2="348" stroke="#d8dee9"/>
+<text x="540.0" y="366" text-anchor="middle" class="svg-muted">50%</text>
+<line x1="680.0" y1="42" x2="680.0" y2="348" stroke="#d8dee9"/>
+<text x="680.0" y="366" text-anchor="middle" class="svg-muted">75%</text>
+<line x1="820.0" y1="42" x2="820.0" y2="348" stroke="#d8dee9"/>
+<text x="820.0" y="366" text-anchor="middle" class="svg-muted">100%</text>
+<text x="250" y="61" text-anchor="end" class="svg-axis">112f1e82c8189d58</text>
+<rect x="260" y="47" width="560" height="18" rx="4" fill="#eef2f7"/>
+<rect x="260" y="47" width="101.8181818181818" height="18" rx="4" fill="#dc2626"/>
+<text x="830" y="61" class="svg-axis">macro-F1 18.2% | acc 22.2%</text>
+<text x="250" y="91" text-anchor="end" class="svg-axis">4cb1a0fbdeaba951</text>
+<rect x="260" y="77" width="560" height="18" rx="4" fill="#eef2f7"/>
+<rect x="260" y="77" width="112.0" height="18" rx="4" fill="#dc2626"/>
+<text x="830" y="91" class="svg-axis">macro-F1 20.0% | acc 25.0%</text>
+<text x="250" y="121" text-anchor="end" class="svg-axis">eb59a469b3ac920b</text>
+<rect x="260" y="107" width="560" height="18" rx="4" fill="#eef2f7"/>
+<rect x="260" y="107" width="112.0" height="18" rx="4" fill="#dc2626"/>
+<text x="830" y="121" class="svg-axis">macro-F1 20.0% | acc 25.0%</text>
+<text x="250" y="151" text-anchor="end" class="svg-axis">0503dacc3da23d1a</text>
+<rect x="260" y="137" width="560" height="18" rx="4" fill="#eef2f7"/>
+<rect x="260" y="137" width="124.44444444444446" height="18" rx="4" fill="#dc2626"/>
+<text x="830" y="151" class="svg-axis">macro-F1 22.2% | acc 28.6%</text>
+<text x="250" y="181" text-anchor="end" class="svg-axis">71202dd2f453c9f3</text>
+<rect x="260" y="167" width="560" height="18" rx="4" fill="#eef2f7"/>
+<rect x="260" y="167" width="129.23076923076923" height="18" rx="4" fill="#dc2626"/>
+<text x="830" y="181" class="svg-axis">macro-F1 23.1% | acc 30.0%</text>
+<text x="250" y="211" text-anchor="end" class="svg-axis">b2987e9e55bb694b</text>
+<rect x="260" y="197" width="560" height="18" rx="4" fill="#eef2f7"/>
+<rect x="260" y="197" width="140.0" height="18" rx="4" fill="#dc2626"/>
+<text x="830" y="211" class="svg-axis">macro-F1 25.0% | acc 33.3%</text>
+<text x="250" y="241" text-anchor="end" class="svg-axis">dd0712959a2dc6b0</text>
+<rect x="260" y="227" width="560" height="18" rx="4" fill="#eef2f7"/>
+<rect x="260" y="227" width="140.0" height="18" rx="4" fill="#dc2626"/>
+<text x="830" y="241" class="svg-axis">macro-F1 25.0% | acc 33.3%</text>
+<text x="250" y="271" text-anchor="end" class="svg-axis">3f83a362bd9e6865</text>
+<rect x="260" y="257" width="560" height="18" rx="4" fill="#eef2f7"/>
+<rect x="260" y="257" width="144.00000000000003" height="18" rx="4" fill="#dc2626"/>
+<text x="830" y="271" class="svg-axis">macro-F1 25.7% | acc 27.8%</text>
+<text x="250" y="301" text-anchor="end" class="svg-axis">e8642b70adfbb6c0</text>
+<rect x="260" y="287" width="560" height="18" rx="4" fill="#eef2f7"/>
+<rect x="260" y="287" width="160.0" height="18" rx="4" fill="#dc2626"/>
+<text x="830" y="301" class="svg-axis">macro-F1 28.6% | acc 40.0%</text>
+<text x="250" y="331" text-anchor="end" class="svg-axis">cc4ac34272e4c3e4</text>
+<rect x="260" y="317" width="560" height="18" rx="4" fill="#eef2f7"/>
+<rect x="260" y="317" width="160.00000000000003" height="18" rx="4" fill="#dc2626"/>
+<text x="830" y="331" class="svg-axis">macro-F1 28.6% | acc 28.6%</text>
+</svg></div>
+
+  <h2>Failed Samples</h2>
+  <div class="panel"><div class="empty-note">No failed samples.</div></div>
+
+  <h2>Worst Video Index</h2>
+  <div class="panel">
+    <table class="domain-table">
+      <thead><tr><th>#</th><th>Video</th><th>Macro-F1</th><th>Accuracy</th><th>Domain</th><th>Link</th><th>Source</th></tr></thead>
+      <tbody><tr><td><a href="#video-1">1</a></td><td>112f1e82c8189d58.mp4</td><td>18.2%</td><td>22.2%</td><td>Arts and Crafts</td><td><a href="videos/112f1e82c8189d58.mp4">video</a></td><td><code>/data1/wearable_ai_challenge_data/egoproactive/val/112f1e82c8189d58.mp4</code></td></tr>
+<tr><td><a href="#video-2">2</a></td><td>4cb1a0fbdeaba951.mp4</td><td>20.0%</td><td>25.0%</td><td>Arts and Crafts</td><td><a href="videos/4cb1a0fbdeaba951.mp4">video</a></td><td><code>/data1/wearable_ai_challenge_data/egoproactive/val/4cb1a0fbdeaba951.mp4</code></td></tr>
+<tr><td><a href="#video-3">3</a></td><td>eb59a469b3ac920b.mp4</td><td>20.0%</td><td>25.0%</td><td>Tutorial</td><td><a href="videos/eb59a469b3ac920b.mp4">video</a></td><td><code>/data1/wearable_ai_challenge_data/egoproactive/val/eb59a469b3ac920b.mp4</code></td></tr>
+<tr><td><a href="#video-4">4</a></td><td>0503dacc3da23d1a.mp4</td><td>22.2%</td><td>28.6%</td><td>Arts and Crafts</td><td><a href="videos/0503dacc3da23d1a.mp4">video</a></td><td><code>/data1/wearable_ai_challenge_data/egoproactive/val/0503dacc3da23d1a.mp4</code></td></tr>
+<tr><td><a href="#video-5">5</a></td><td>71202dd2f453c9f3.mp4</td><td>23.1%</td><td>30.0%</td><td>Handyman</td><td><a href="videos/71202dd2f453c9f3.mp4">video</a></td><td><code>/data1/wearable_ai_challenge_data/egoproactive/val/71202dd2f453c9f3.mp4</code></td></tr>
+<tr><td><a href="#video-6">6</a></td><td>b2987e9e55bb694b.mp4</td><td>25.0%</td><td>33.3%</td><td>Tutorial</td><td><a href="videos/b2987e9e55bb694b.mp4">video</a></td><td><code>/data1/wearable_ai_challenge_data/egoproactive/val/b2987e9e55bb694b.mp4</code></td></tr>
+<tr><td><a href="#video-7">7</a></td><td>dd0712959a2dc6b0.mp4</td><td>25.0%</td><td>33.3%</td><td>Arts and Crafts</td><td><a href="videos/dd0712959a2dc6b0.mp4">video</a></td><td><code>/data1/wearable_ai_challenge_data/egoproactive/val/dd0712959a2dc6b0.mp4</code></td></tr>
+<tr><td><a href="#video-8">8</a></td><td>3f83a362bd9e6865.mp4</td><td>25.7%</td><td>27.8%</td><td>Chef</td><td><a href="videos/3f83a362bd9e6865.mp4">video</a></td><td><code>/data1/wearable_ai_challenge_data/egoproactive/val/3f83a362bd9e6865.mp4</code></td></tr>
+<tr><td><a href="#video-9">9</a></td><td>e8642b70adfbb6c0.mp4</td><td>28.6%</td><td>40.0%</td><td>Arts and Crafts</td><td><a href="videos/e8642b70adfbb6c0.mp4">video</a></td><td><code>/data1/wearable_ai_challenge_data/egoproactive/val/e8642b70adfbb6c0.mp4</code></td></tr>
+<tr><td><a href="#video-10">10</a></td><td>cc4ac34272e4c3e4.mp4</td><td>28.6%</td><td>28.6%</td><td>Tutorial</td><td><a href="videos/cc4ac34272e4c3e4.mp4">video</a></td><td><code>/data1/wearable_ai_challenge_data/egoproactive/val/cc4ac34272e4c3e4.mp4</code></td></tr></tbody>
+    </table>
+  </div>
+
+  <h2>Worst Video Timelines And Intervals</h2>
+  
+            <section class="video-section" id="video-1">
+              <details open>
+                <summary>
+                  <span>1. 112f1e82c8189d58.mp4</span>
+                  <span class="summary-meta">macro-F1 18.2% | acc 22.2% (2/9) | Arts and Crafts</span>
+                </summary>
+                <div class="video-meta">
+                  <div><strong>Task:</strong> Folding a paper butterfly</div>
+                  <div><strong>Query:</strong> How do I fold a paper butterfly?</div>
+                  <div><strong>Video:</strong> <a href="videos/112f1e82c8189d58.mp4">videos/112f1e82c8189d58.mp4</a></div>
+                  <div><code>/data1/wearable_ai_challenge_data/egoproactive/val/112f1e82c8189d58.mp4</code></div>
+                </div>
+                <video class="video-player" controls preload="metadata" src="videos/112f1e82c8189d58.mp4"></video>
+                <svg viewBox="0 0 1040 156" class="timeline" role="img" aria-label="Timeline for 112f1e82c8189d58.mp4">
+<text x="86" y="24" class="svg-axis">112f1e82c8189d58.mp4</text>
+<text x="18" y="65" class="svg-axis">GT</text>
+<text x="18" y="109" class="svg-axis">Pred</text>
+<line x1="86.0" y1="36" x2="86.0" y2="124" stroke="#d8dee9"/>
+<text x="86.0" y="146" text-anchor="middle" class="svg-muted">0s</text>
+<line x1="272.0" y1="36" x2="272.0" y2="124" stroke="#d8dee9"/>
+<text x="272.0" y="146" text-anchor="middle" class="svg-muted">27s</text>
+<line x1="458.0" y1="36" x2="458.0" y2="124" stroke="#d8dee9"/>
+<text x="458.0" y="146" text-anchor="middle" class="svg-muted">55s</text>
+<line x1="644.0000000000001" y1="36" x2="644.0000000000001" y2="124" stroke="#d8dee9"/>
+<text x="644.0000000000001" y="146" text-anchor="middle" class="svg-muted">82s</text>
+<line x1="830.0" y1="36" x2="830.0" y2="124" stroke="#d8dee9"/>
+<text x="830.0" y="146" text-anchor="middle" class="svg-muted">110s</text>
+<line x1="1016.0" y1="36" x2="1016.0" y2="124" stroke="#d8dee9"/>
+<text x="1016.0" y="146" text-anchor="middle" class="svg-muted">137s</text>
+<rect x="86.00" y="48" width="13.54" height="25" rx="4" fill="#d95f02" opacity="0.72" stroke="#ffffff" stroke-width="1"><title>GT interval 0: interrupt; GT=interrupt; Pred=interrupt; PPL=1.128</title></rect>
+<rect x="99.54" y="48" width="27.07" height="25" rx="4" fill="#d95f02" opacity="0.72" stroke="#ffffff" stroke-width="1"><title>GT interval 1: interrupt; GT=interrupt; Pred=interrupt; PPL=1.057</title></rect>
+<rect x="126.61" y="48" width="40.61" height="25" rx="4" fill="#d95f02" opacity="0.72" stroke="#ffffff" stroke-width="1"><title>GT interval 2: interrupt; GT=interrupt; Pred=silent; PPL=1.081</title></rect>
+<rect x="167.22" y="48" width="54.15" height="25" rx="4" fill="#d95f02" opacity="0.72" stroke="#ffffff" stroke-width="1"><title>GT interval 3: interrupt; GT=interrupt; Pred=silent; PPL=1.101</title></rect>
+<rect x="221.37" y="48" width="101.53" height="25" rx="4" fill="#d95f02" opacity="0.72" stroke="#ffffff" stroke-width="1"><title>GT interval 4: interrupt; GT=interrupt; Pred=silent; PPL=1.080</title></rect>
+<rect x="322.90" y="48" width="67.69" height="25" rx="4" fill="#d95f02" opacity="0.72" stroke="#ffffff" stroke-width="1"><title>GT interval 5: interrupt; GT=interrupt; Pred=silent; PPL=1.074</title></rect>
+<rect x="390.59" y="48" width="47.38" height="25" rx="4" fill="#d95f02" opacity="0.72" stroke="#ffffff" stroke-width="1"><title>GT interval 6: interrupt; GT=interrupt; Pred=silent; PPL=1.091</title></rect>
+<rect x="437.97" y="48" width="189.52" height="25" rx="4" fill="#d95f02" opacity="0.72" stroke="#ffffff" stroke-width="1"><title>GT interval 7: interrupt; GT=interrupt; Pred=silent; PPL=1.145</title></rect>
+<rect x="627.48" y="48" width="388.52" height="25" rx="4" fill="#d95f02" opacity="0.72" stroke="#ffffff" stroke-width="1"><title>GT interval 8: interrupt; GT=interrupt; Pred=silent; PPL=1.074</title></rect>
+<rect x="86.00" y="92" width="13.54" height="25" rx="4" fill="#d95f02" opacity="0.95" stroke="#ffffff" stroke-width="1"><title>Pred interval 0: interrupt; GT=interrupt; Pred=interrupt; PPL=1.128</title></rect>
+<rect x="99.54" y="92" width="27.07" height="25" rx="4" fill="#d95f02" opacity="0.95" stroke="#ffffff" stroke-width="1"><title>Pred interval 1: interrupt; GT=interrupt; Pred=interrupt; PPL=1.057</title></rect>
+<rect x="126.61" y="92" width="40.61" height="25" rx="4" fill="#1b9e77" opacity="0.95" stroke="#e7298a" stroke-width="2"><title>Pred interval 2: silent; GT=interrupt; Pred=silent; PPL=1.081</title></rect>
+<line x1="141.92" y1="99.50" x2="151.92" y2="109.50" stroke="#ffffff" stroke-width="2"/>
+<line x1="151.92" y1="99.50" x2="141.92" y2="109.50" stroke="#ffffff" stroke-width="2"/>
+<rect x="167.22" y="92" width="54.15" height="25" rx="4" fill="#1b9e77" opacity="0.95" stroke="#e7298a" stroke-width="2"><title>Pred interval 3: silent; GT=interrupt; Pred=silent; PPL=1.101</title></rect>
+<line x1="189.30" y1="99.50" x2="199.30" y2="109.50" stroke="#ffffff" stroke-width="2"/>
+<line x1="199.30" y1="99.50" x2="189.30" y2="109.50" stroke="#ffffff" stroke-width="2"/>
+<rect x="221.37" y="92" width="101.53" height="25" rx="4" fill="#1b9e77" opacity="0.95" stroke="#e7298a" stroke-width="2"><title>Pred interval 4: silent; GT=interrupt; Pred=silent; PPL=1.080</title></rect>
+<line x1="267.14" y1="99.50" x2="277.14" y2="109.50" stroke="#ffffff" stroke-width="2"/>
+<line x1="277.14" y1="99.50" x2="267.14" y2="109.50" stroke="#ffffff" stroke-width="2"/>
+<rect x="322.90" y="92" width="67.69" height="25" rx="4" fill="#1b9e77" opacity="0.95" stroke="#e7298a" stroke-width="2"><title>Pred interval 5: silent; GT=interrupt; Pred=silent; PPL=1.074</title></rect>
+<line x1="351.74" y1="99.50" x2="361.74" y2="109.50" stroke="#ffffff" stroke-width="2"/>
+<line x1="361.74" y1="99.50" x2="351.74" y2="109.50" stroke="#ffffff" stroke-width="2"/>
+<rect x="390.59" y="92" width="47.38" height="25" rx="4" fill="#1b9e77" opacity="0.95" stroke="#e7298a" stroke-width="2"><title>Pred interval 6: silent; GT=interrupt; Pred=silent; PPL=1.091</title></rect>
+<line x1="409.28" y1="99.50" x2="419.28" y2="109.50" stroke="#ffffff" stroke-width="2"/>
+<line x1="419.28" y1="99.50" x2="409.28" y2="109.50" stroke="#ffffff" stroke-width="2"/>
+<rect x="437.97" y="92" width="189.52" height="25" rx="4" fill="#1b9e77" opacity="0.95" stroke="#e7298a" stroke-width="2"><title>Pred interval 7: silent; GT=interrupt; Pred=silent; PPL=1.145</title></rect>
+<line x1="527.72" y1="99.50" x2="537.72" y2="109.50" stroke="#ffffff" stroke-width="2"/>
+<line x1="537.72" y1="99.50" x2="527.72" y2="109.50" stroke="#ffffff" stroke-width="2"/>
+<rect x="627.48" y="92" width="388.52" height="25" rx="4" fill="#1b9e77" opacity="0.95" stroke="#e7298a" stroke-width="2"><title>Pred interval 8: silent; GT=interrupt; Pred=silent; PPL=1.074</title></rect>
+<line x1="816.74" y1="99.50" x2="826.74" y2="109.50" stroke="#ffffff" stroke-width="2"/>
+<line x1="826.74" y1="99.50" x2="816.74" y2="109.50" stroke="#ffffff" stroke-width="2"/>
+</svg>
+                <div class="table-wrap">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>#</th><th>Interval</th><th>Frames</th><th>Times</th><th>Sample preds</th><th>Votes</th>
+                        <th>GT</th><th>Pred</th><th>Correct</th><th>PPL</th><th>Gate</th>
+                        <th>GT answer</th><th>Generated text</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr class="ok"><td>0</td><td>0.0-2.0s</td><td>4, 11, 19, 26</td><td>0.27, 0.73, 1.27, 1.73</td><td>interrupt, interrupt, interrupt, silent</td><td>3 int / 1 sil</td><td><span class="pill interrupt">interrupt</span></td><td><span class="pill interrupt">interrupt</span></td><td>yes</td><td>1.128</td><td>1.217</td><td>Grab that square piece of paper — you’re all set to start!</td><td>No one is folding a paper butterfly. | The person in red folds the paper butterfly. | The person in red folds the paper butterfly.</td></tr>
+<tr class="ok"><td>1</td><td>2.0-6.0s</td><td>38, 52, 68, 82</td><td>2.53, 3.47, 4.53, 5.47</td><td>silent, silent, interrupt, silent</td><td>1 int / 3 sil</td><td><span class="pill interrupt">interrupt</span></td><td><span class="pill interrupt">interrupt</span></td><td>yes</td><td>1.057</td><td>1.148</td><td>Now fold it diagonally to make a triangle—nice and neat!</td><td>The person in red folds the paper butterfly again.</td></tr>
+<tr class="bad"><td>2</td><td>6.0-12.0s</td><td>101, 124, 146, 169</td><td>6.73, 8.27, 9.73, 11.27</td><td>silent, silent, silent, silent</td><td>0 int / 4 sil</td><td><span class="pill interrupt">interrupt</span></td><td><span class="pill silent">silent</span></td><td>no</td><td>1.081</td><td>1.148</td><td>Now unfold it and fold diagonally the other way—let’s make that X crease!</td><td></td></tr>
+<tr class="bad"><td>3</td><td>12.0-20.0s</td><td>195, 225, 255, 285</td><td>13.00, 15.00, 17.00, 19.00</td><td>silent, silent, silent, silent</td><td>0 int / 4 sil</td><td><span class="pill interrupt">interrupt</span></td><td><span class="pill silent">silent</span></td><td>no</td><td>1.101</td><td>1.148</td><td>Fold your paper in half horizontally—just like making a little rectangle!</td><td></td></tr>
+<tr class="bad"><td>4</td><td>20.0-35.0s</td><td>328, 384, 441, 497</td><td>21.87, 25.60, 29.40, 33.13</td><td>silent, silent, silent, silent</td><td>0 int / 4 sil</td><td><span class="pill interrupt">interrupt</span></td><td><span class="pill silent">silent</span></td><td>no</td><td>1.080</td><td>1.148</td><td>Now fold it the other way to make a rectangle.</td><td></td></tr>
+<tr class="bad"><td>5</td><td>35.0-45.0s</td><td>544, 581, 619, 656</td><td>36.27, 38.73, 41.27, 43.73</td><td>silent, silent, silent, silent</td><td>0 int / 4 sil</td><td><span class="pill interrupt">interrupt</span></td><td><span class="pill silent">silent</span></td><td>no</td><td>1.074</td><td>1.148</td><td>Fold that bottom point up, tuck it under the top flaps, and press it down into a neat triangle.</td><td></td></tr>
+<tr class="bad"><td>6</td><td>45.0-52.0s</td><td>688, 714, 741, 767</td><td>45.87, 47.60, 49.40, 51.13</td><td>silent, silent, silent, silent</td><td>0 int / 4 sil</td><td><span class="pill interrupt">interrupt</span></td><td><span class="pill silent">silent</span></td><td>no</td><td>1.091</td><td>1.148</td><td>Fold those top two corners of the triangle down—nice and easy!</td><td></td></tr>
+<tr class="bad"><td>7</td><td>52.0-80.0s</td><td>832, 938, 1042, 1148</td><td>55.47, 62.53, 69.47, 76.53</td><td>silent, silent, silent, silent</td><td>0 int / 4 sil</td><td><span class="pill interrupt">interrupt</span></td><td><span class="pill silent">silent</span></td><td>no</td><td>1.145</td><td>1.148</td><td>Gently pull the top layers outward to form wings</td><td></td></tr>
+<tr class="bad"><td>8</td><td>80.0-137.4s</td><td>1308, 1523, 1738, 1953</td><td>87.20, 101.53, 115.87, 130.20</td><td>silent, silent, silent, silent</td><td>0 int / 4 sil</td><td><span class="pill interrupt">interrupt</span></td><td><span class="pill silent">silent</span></td><td>no</td><td>1.074</td><td>1.148</td><td>Gently tweak the wings so they mirror each other—perfect symmetry for your butterfly!</td><td></td></tr>
+                    </tbody>
+                  </table>
+                </div>
+              </details>
+            </section>
+            
+            <section class="video-section" id="video-2">
+              <details open>
+                <summary>
+                  <span>2. 4cb1a0fbdeaba951.mp4</span>
+                  <span class="summary-meta">macro-F1 20.0% | acc 25.0% (2/8) | Arts and Crafts</span>
+                </summary>
+                <div class="video-meta">
+                  <div><strong>Task:</strong> Drawing a simple floral pattern</div>
+                  <div><strong>Query:</strong> How do I draw a simple floral pattern?</div>
+                  <div><strong>Video:</strong> <a href="videos/4cb1a0fbdeaba951.mp4">videos/4cb1a0fbdeaba951.mp4</a></div>
+                  <div><code>/data1/wearable_ai_challenge_data/egoproactive/val/4cb1a0fbdeaba951.mp4</code></div>
+                </div>
+                <video class="video-player" controls preload="metadata" src="videos/4cb1a0fbdeaba951.mp4"></video>
+                <svg viewBox="0 0 1040 156" class="timeline" role="img" aria-label="Timeline for 4cb1a0fbdeaba951.mp4">
+<text x="86" y="24" class="svg-axis">4cb1a0fbdeaba951.mp4</text>
+<text x="18" y="65" class="svg-axis">GT</text>
+<text x="18" y="109" class="svg-axis">Pred</text>
+<line x1="86.0" y1="36" x2="86.0" y2="124" stroke="#d8dee9"/>
+<text x="86.0" y="146" text-anchor="middle" class="svg-muted">0s</text>
+<line x1="272.0" y1="36" x2="272.0" y2="124" stroke="#d8dee9"/>
+<text x="272.0" y="146" text-anchor="middle" class="svg-muted">33s</text>
+<line x1="458.0" y1="36" x2="458.0" y2="124" stroke="#d8dee9"/>
+<text x="458.0" y="146" text-anchor="middle" class="svg-muted">66s</text>
+<line x1="644.0" y1="36" x2="644.0" y2="124" stroke="#d8dee9"/>
+<text x="644.0" y="146" text-anchor="middle" class="svg-muted">98s</text>
+<line x1="830.0" y1="36" x2="830.0" y2="124" stroke="#d8dee9"/>
+<text x="830.0" y="146" text-anchor="middle" class="svg-muted">131s</text>
+<line x1="1016.0" y1="36" x2="1016.0" y2="124" stroke="#d8dee9"/>
+<text x="1016.0" y="146" text-anchor="middle" class="svg-muted">164s</text>
+<rect x="86.00" y="48" width="5.67" height="25" rx="4" fill="#d95f02" opacity="0.72" stroke="#ffffff" stroke-width="1"><title>GT interval 0: interrupt; GT=interrupt; Pred=interrupt; PPL=1.339</title></rect>
+<rect x="91.67" y="48" width="51.57" height="25" rx="4" fill="#d95f02" opacity="0.72" stroke="#ffffff" stroke-width="1"><title>GT interval 1: interrupt; GT=interrupt; Pred=interrupt; PPL=1.192</title></rect>
+<rect x="143.24" y="48" width="82.18" height="25" rx="4" fill="#d95f02" opacity="0.72" stroke="#ffffff" stroke-width="1"><title>GT interval 2: interrupt; GT=interrupt; Pred=silent; PPL=1.235</title></rect>
+<rect x="225.41" y="48" width="14.17" height="25" rx="4" fill="#d95f02" opacity="0.72" stroke="#ffffff" stroke-width="1"><title>GT interval 3: interrupt; GT=interrupt; Pred=silent; PPL=1.182</title></rect>
+<rect x="239.58" y="48" width="34.57" height="25" rx="4" fill="#d95f02" opacity="0.72" stroke="#ffffff" stroke-width="1"><title>GT interval 4: interrupt; GT=interrupt; Pred=silent; PPL=1.182</title></rect>
+<rect x="274.15" y="48" width="28.34" height="25" rx="4" fill="#d95f02" opacity="0.72" stroke="#ffffff" stroke-width="1"><title>GT interval 5: interrupt; GT=interrupt; Pred=silent; PPL=1.161</title></rect>
+<rect x="302.49" y="48" width="8.50" height="25" rx="4" fill="#d95f02" opacity="0.72" stroke="#ffffff" stroke-width="1"><title>GT interval 6: interrupt; GT=interrupt; Pred=silent; PPL=1.154</title></rect>
+<rect x="310.99" y="48" width="705.01" height="25" rx="4" fill="#d95f02" opacity="0.72" stroke="#ffffff" stroke-width="1"><title>GT interval 7: interrupt; GT=interrupt; Pred=silent; PPL=1.221</title></rect>
+<rect x="86.00" y="92" width="5.67" height="25" rx="4" fill="#d95f02" opacity="0.95" stroke="#ffffff" stroke-width="1"><title>Pred interval 0: interrupt; GT=interrupt; Pred=interrupt; PPL=1.339</title></rect>
+<rect x="91.67" y="92" width="51.57" height="25" rx="4" fill="#d95f02" opacity="0.95" stroke="#ffffff" stroke-width="1"><title>Pred interval 1: interrupt; GT=interrupt; Pred=interrupt; PPL=1.192</title></rect>
+<rect x="143.24" y="92" width="82.18" height="25" rx="4" fill="#1b9e77" opacity="0.95" stroke="#e7298a" stroke-width="2"><title>Pred interval 2: silent; GT=interrupt; Pred=silent; PPL=1.235</title></rect>
+<line x1="179.33" y1="99.50" x2="189.33" y2="109.50" stroke="#ffffff" stroke-width="2"/>
+<line x1="189.33" y1="99.50" x2="179.33" y2="109.50" stroke="#ffffff" stroke-width="2"/>
+<rect x="225.41" y="92" width="14.17" height="25" rx="4" fill="#1b9e77" opacity="0.95" stroke="#e7298a" stroke-width="2"><title>Pred interval 3: silent; GT=interrupt; Pred=silent; PPL=1.182</title></rect>
+<line x1="227.50" y1="99.50" x2="237.50" y2="109.50" stroke="#ffffff" stroke-width="2"/>
+<line x1="237.50" y1="99.50" x2="227.50" y2="109.50" stroke="#ffffff" stroke-width="2"/>
+<rect x="239.58" y="92" width="34.57" height="25" rx="4" fill="#1b9e77" opacity="0.95" stroke="#e7298a" stroke-width="2"><title>Pred interval 4: silent; GT=interrupt; Pred=silent; PPL=1.182</title></rect>
+<line x1="251.87" y1="99.50" x2="261.87" y2="109.50" stroke="#ffffff" stroke-width="2"/>
+<line x1="261.87" y1="99.50" x2="251.87" y2="109.50" stroke="#ffffff" stroke-width="2"/>
+<rect x="274.15" y="92" width="28.34" height="25" rx="4" fill="#1b9e77" opacity="0.95" stroke="#e7298a" stroke-width="2"><title>Pred interval 5: silent; GT=interrupt; Pred=silent; PPL=1.161</title></rect>
+<line x1="283.32" y1="99.50" x2="293.32" y2="109.50" stroke="#ffffff" stroke-width="2"/>
+<line x1="293.32" y1="99.50" x2="283.32" y2="109.50" stroke="#ffffff" stroke-width="2"/>
+<rect x="302.49" y="92" width="8.50" height="25" rx="4" fill="#1b9e77" opacity="0.95" stroke="#e7298a" stroke-width="2"><title>Pred interval 6: silent; GT=interrupt; Pred=silent; PPL=1.154</title></rect>
+<line x1="301.74" y1="99.50" x2="311.74" y2="109.50" stroke="#ffffff" stroke-width="2"/>
+<line x1="311.74" y1="99.50" x2="301.74" y2="109.50" stroke="#ffffff" stroke-width="2"/>
+<rect x="310.99" y="92" width="705.01" height="25" rx="4" fill="#1b9e77" opacity="0.95" stroke="#e7298a" stroke-width="2"><title>Pred interval 7: silent; GT=interrupt; Pred=silent; PPL=1.221</title></rect>
+<line x1="658.50" y1="99.50" x2="668.50" y2="109.50" stroke="#ffffff" stroke-width="2"/>
+<line x1="668.50" y1="99.50" x2="658.50" y2="109.50" stroke="#ffffff" stroke-width="2"/>
+</svg>
+                <div class="table-wrap">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>#</th><th>Interval</th><th>Frames</th><th>Times</th><th>Sample preds</th><th>Votes</th>
+                        <th>GT</th><th>Pred</th><th>Correct</th><th>PPL</th><th>Gate</th>
+                        <th>GT answer</th><th>Generated text</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr class="ok"><td>0</td><td>0.0-1.0s</td><td>2, 6, 9, 13</td><td>0.13, 0.40, 0.60, 0.87</td><td>interrupt, interrupt, silent, interrupt</td><td>3 int / 1 sil</td><td><span class="pill interrupt">interrupt</span></td><td><span class="pill interrupt">interrupt</span></td><td>yes</td><td>1.339</td><td>1.327</td><td>Alright, grab that plain white paper and lay it flat on your surface—ready to go!</td><td>The scene is a room with many toys and decorations. | The scene switches to a white table with a white sheet of paper on it. A hand is holding a blue crayon and starts drawing o...</td></tr>
+<tr class="ok"><td>1</td><td>1.0-10.1s</td><td>32, 66, 100, 134</td><td>2.13, 4.40, 6.67, 8.93</td><td>silent, interrupt, silent, silent</td><td>1 int / 3 sil</td><td><span class="pill interrupt">interrupt</span></td><td><span class="pill interrupt">interrupt</span></td><td>yes</td><td>1.192</td><td>1.264</td><td>Next, draw stem lines using the blue marker.</td><td>The scene switches to the white table, and a hand is holding a blue crayon and starts drawing on the white paper.</td></tr>
+<tr class="bad"><td>2</td><td>10.1-24.6s</td><td>179, 233, 287, 342</td><td>11.93, 15.53, 19.13, 22.80</td><td>silent, silent, silent, silent</td><td>0 int / 4 sil</td><td><span class="pill interrupt">interrupt</span></td><td><span class="pill silent">silent</span></td><td>no</td><td>1.235</td><td>1.264</td><td>Oops — skip the blue marker for stems, it looks unnatural! Switch to the green marker, trace over the blue lines, and add a decorative heart shape.</td><td></td></tr>
+<tr class="bad"><td>3</td><td>24.6-27.1s</td><td>374, 383, 392, 402</td><td>24.93, 25.53, 26.13, 26.80</td><td>silent, silent, silent, silent</td><td>0 int / 4 sil</td><td><span class="pill interrupt">interrupt</span></td><td><span class="pill silent">silent</span></td><td>no</td><td>1.182</td><td>1.264</td><td>Grab your pink, green, and yellow markers, tweak the paper’s spot, and get ready to add those little details!</td><td></td></tr>
+<tr class="bad"><td>4</td><td>27.1-33.2s</td><td>418, 441, 464, 487</td><td>27.87, 29.40, 30.93, 32.47</td><td>silent, silent, silent, silent</td><td>0 int / 4 sil</td><td><span class="pill interrupt">interrupt</span></td><td><span class="pill silent">silent</span></td><td>no</td><td>1.182</td><td>1.264</td><td>Time to draw a flower—five soft pink petals, nice and rounded!</td><td></td></tr>
+<tr class="bad"><td>5</td><td>33.2-38.2s</td><td>507, 526, 545, 564</td><td>33.80, 35.07, 36.33, 37.60</td><td>silent, silent, silent, silent</td><td>0 int / 4 sil</td><td><span class="pill interrupt">interrupt</span></td><td><span class="pill silent">silent</span></td><td>no</td><td>1.161</td><td>1.264</td><td>Time to color the flower pink—grab your pink marker and fill it in!</td><td></td></tr>
+<tr class="bad"><td>6</td><td>38.2-39.7s</td><td>576, 581, 587, 593</td><td>38.40, 38.73, 39.13, 39.53</td><td>silent, silent, silent, silent</td><td>0 int / 4 sil</td><td><span class="pill interrupt">interrupt</span></td><td><span class="pill silent">silent</span></td><td>no</td><td>1.154</td><td>1.264</td><td>Time to add those final petal details to your flowers—just a few more strokes to make them pop!</td><td></td></tr>
+<tr class="bad"><td>7</td><td>39.7-164.1s</td><td>829, 1295, 1762, 2228</td><td>55.27, 86.33, 117.47, 148.53</td><td>silent, silent, silent, silent</td><td>0 int / 4 sil</td><td><span class="pill interrupt">interrupt</span></td><td><span class="pill silent">silent</span></td><td>no</td><td>1.221</td><td>1.264</td><td>Add finishing touch to first flower, and continue to draw additional  flowers.</td><td></td></tr>
+                    </tbody>
+                  </table>
+                </div>
+              </details>
+            </section>
+            
+            <section class="video-section" id="video-3">
+              <details open>
+                <summary>
+                  <span>3. eb59a469b3ac920b.mp4</span>
+                  <span class="summary-meta">macro-F1 20.0% | acc 25.0% (3/12) | Tutorial</span>
+                </summary>
+                <div class="video-meta">
+                  <div><strong>Task:</strong> How to wrap your wrist with athletic tape</div>
+                  <div><strong>Query:</strong> How do I wrap my wrist with athletic tape?</div>
+                  <div><strong>Video:</strong> <a href="videos/eb59a469b3ac920b.mp4">videos/eb59a469b3ac920b.mp4</a></div>
+                  <div><code>/data1/wearable_ai_challenge_data/egoproactive/val/eb59a469b3ac920b.mp4</code></div>
+                </div>
+                <video class="video-player" controls preload="metadata" src="videos/eb59a469b3ac920b.mp4"></video>
+                <svg viewBox="0 0 1040 156" class="timeline" role="img" aria-label="Timeline for eb59a469b3ac920b.mp4">
+<text x="86" y="24" class="svg-axis">eb59a469b3ac920b.mp4</text>
+<text x="18" y="65" class="svg-axis">GT</text>
+<text x="18" y="109" class="svg-axis">Pred</text>
+<line x1="86.0" y1="36" x2="86.0" y2="124" stroke="#d8dee9"/>
+<text x="86.0" y="146" text-anchor="middle" class="svg-muted">0s</text>
+<line x1="272.0" y1="36" x2="272.0" y2="124" stroke="#d8dee9"/>
+<text x="272.0" y="146" text-anchor="middle" class="svg-muted">32s</text>
+<line x1="458.0" y1="36" x2="458.0" y2="124" stroke="#d8dee9"/>
+<text x="458.0" y="146" text-anchor="middle" class="svg-muted">65s</text>
+<line x1="644.0" y1="36" x2="644.0" y2="124" stroke="#d8dee9"/>
+<text x="644.0" y="146" text-anchor="middle" class="svg-muted">97s</text>
+<line x1="830.0" y1="36" x2="830.0" y2="124" stroke="#d8dee9"/>
+<text x="830.0" y="146" text-anchor="middle" class="svg-muted">130s</text>
+<line x1="1016.0" y1="36" x2="1016.0" y2="124" stroke="#d8dee9"/>
+<text x="1016.0" y="146" text-anchor="middle" class="svg-muted">162s</text>
+<rect x="86.00" y="48" width="10.91" height="25" rx="4" fill="#d95f02" opacity="0.72" stroke="#ffffff" stroke-width="1"><title>GT interval 0: interrupt; GT=interrupt; Pred=interrupt; PPL=1.028</title></rect>
+<rect x="96.91" y="48" width="73.53" height="25" rx="4" fill="#d95f02" opacity="0.72" stroke="#ffffff" stroke-width="1"><title>GT interval 1: interrupt; GT=interrupt; Pred=interrupt; PPL=1.064</title></rect>
+<rect x="170.44" y="48" width="16.66" height="25" rx="4" fill="#d95f02" opacity="0.72" stroke="#ffffff" stroke-width="1"><title>GT interval 2: interrupt; GT=interrupt; Pred=interrupt; PPL=1.178</title></rect>
+<rect x="187.10" y="48" width="55.15" height="25" rx="4" fill="#d95f02" opacity="0.72" stroke="#ffffff" stroke-width="1"><title>GT interval 3: interrupt; GT=interrupt; Pred=silent; PPL=1.128</title></rect>
+<rect x="242.24" y="48" width="16.66" height="25" rx="4" fill="#d95f02" opacity="0.72" stroke="#ffffff" stroke-width="1"><title>GT interval 4: interrupt; GT=interrupt; Pred=silent; PPL=1.065</title></rect>
+<rect x="258.90" y="48" width="33.89" height="25" rx="4" fill="#d95f02" opacity="0.72" stroke="#ffffff" stroke-width="1"><title>GT interval 5: interrupt; GT=interrupt; Pred=silent; PPL=1.041</title></rect>
+<rect x="292.79" y="48" width="27.57" height="25" rx="4" fill="#d95f02" opacity="0.72" stroke="#ffffff" stroke-width="1"><title>GT interval 6: interrupt; GT=interrupt; Pred=silent; PPL=1.069</title></rect>
+<rect x="320.37" y="48" width="142.46" height="25" rx="4" fill="#d95f02" opacity="0.72" stroke="#ffffff" stroke-width="1"><title>GT interval 7: interrupt; GT=interrupt; Pred=silent; PPL=1.055</title></rect>
+<rect x="462.83" y="48" width="78.12" height="25" rx="4" fill="#d95f02" opacity="0.72" stroke="#ffffff" stroke-width="1"><title>GT interval 8: interrupt; GT=interrupt; Pred=silent; PPL=1.099</title></rect>
+<rect x="540.95" y="48" width="56.29" height="25" rx="4" fill="#d95f02" opacity="0.72" stroke="#ffffff" stroke-width="1"><title>GT interval 9: interrupt; GT=interrupt; Pred=silent; PPL=1.056</title></rect>
+<rect x="597.24" y="48" width="387.74" height="25" rx="4" fill="#d95f02" opacity="0.72" stroke="#ffffff" stroke-width="1"><title>GT interval 10: interrupt; GT=interrupt; Pred=silent; PPL=1.095</title></rect>
+<rect x="984.98" y="48" width="31.02" height="25" rx="4" fill="#d95f02" opacity="0.72" stroke="#ffffff" stroke-width="1"><title>GT interval 11: interrupt; GT=interrupt; Pred=silent; PPL=1.067</title></rect>
+<rect x="86.00" y="92" width="10.91" height="25" rx="4" fill="#d95f02" opacity="0.95" stroke="#ffffff" stroke-width="1"><title>Pred interval 0: interrupt; GT=interrupt; Pred=interrupt; PPL=1.028</title></rect>
+<rect x="96.91" y="92" width="73.53" height="25" rx="4" fill="#d95f02" opacity="0.95" stroke="#ffffff" stroke-width="1"><title>Pred interval 1: interrupt; GT=interrupt; Pred=interrupt; PPL=1.064</title></rect>
+<rect x="170.44" y="92" width="16.66" height="25" rx="4" fill="#d95f02" opacity="0.95" stroke="#ffffff" stroke-width="1"><title>Pred interval 2: interrupt; GT=interrupt; Pred=interrupt; PPL=1.178</title></rect>
+<rect x="187.10" y="92" width="55.15" height="25" rx="4" fill="#1b9e77" opacity="0.95" stroke="#e7298a" stroke-width="2"><title>Pred interval 3: silent; GT=interrupt; Pred=silent; PPL=1.128</title></rect>
+<line x1="209.67" y1="99.50" x2="219.67" y2="109.50" stroke="#ffffff" stroke-width="2"/>
+<line x1="219.67" y1="99.50" x2="209.67" y2="109.50" stroke="#ffffff" stroke-width="2"/>
+<rect x="242.24" y="92" width="16.66" height="25" rx="4" fill="#1b9e77" opacity="0.95" stroke="#e7298a" stroke-width="2"><title>Pred interval 4: silent; GT=interrupt; Pred=silent; PPL=1.065</title></rect>
+<line x1="245.57" y1="99.50" x2="255.57" y2="109.50" stroke="#ffffff" stroke-width="2"/>
+<line x1="255.57" y1="99.50" x2="245.57" y2="109.50" stroke="#ffffff" stroke-width="2"/>
+<rect x="258.90" y="92" width="33.89" height="25" rx="4" fill="#1b9e77" opacity="0.95" stroke="#e7298a" stroke-width="2"><title>Pred interval 5: silent; GT=interrupt; Pred=silent; PPL=1.041</title></rect>
+<line x1="270.85" y1="99.50" x2="280.85" y2="109.50" stroke="#ffffff" stroke-width="2"/>
+<line x1="280.85" y1="99.50" x2="270.85" y2="109.50" stroke="#ffffff" stroke-width="2"/>
+<rect x="292.79" y="92" width="27.57" height="25" rx="4" fill="#1b9e77" opacity="0.95" stroke="#e7298a" stroke-width="2"><title>Pred interval 6: silent; GT=interrupt; Pred=silent; PPL=1.069</title></rect>
+<line x1="301.58" y1="99.50" x2="311.58" y2="109.50" stroke="#ffffff" stroke-width="2"/>
+<line x1="311.58" y1="99.50" x2="301.58" y2="109.50" stroke="#ffffff" stroke-width="2"/>
+<rect x="320.37" y="92" width="142.46" height="25" rx="4" fill="#1b9e77" opacity="0.95" stroke="#e7298a" stroke-width="2"><title>Pred interval 7: silent; GT=interrupt; Pred=silent; PPL=1.055</title></rect>
+<line x1="386.60" y1="99.50" x2="396.60" y2="109.50" stroke="#ffffff" stroke-width="2"/>
+<line x1="396.60" y1="99.50" x2="386.60" y2="109.50" stroke="#ffffff" stroke-width="2"/>
+<rect x="462.83" y="92" width="78.12" height="25" rx="4" fill="#1b9e77" opacity="0.95" stroke="#e7298a" stroke-width="2"><title>Pred interval 8: silent; GT=interrupt; Pred=silent; PPL=1.099</title></rect>
+<line x1="496.89" y1="99.50" x2="506.89" y2="109.50" stroke="#ffffff" stroke-width="2"/>
+<line x1="506.89" y1="99.50" x2="496.89" y2="109.50" stroke="#ffffff" stroke-width="2"/>
+<rect x="540.95" y="92" width="56.29" height="25" rx="4" fill="#1b9e77" opacity="0.95" stroke="#e7298a" stroke-width="2"><title>Pred interval 9: silent; GT=interrupt; Pred=silent; PPL=1.056</title></rect>
+<line x1="564.09" y1="99.50" x2="574.09" y2="109.50" stroke="#ffffff" stroke-width="2"/>
+<line x1="574.09" y1="99.50" x2="564.09" y2="109.50" stroke="#ffffff" stroke-width="2"/>
+<rect x="597.24" y="92" width="387.74" height="25" rx="4" fill="#1b9e77" opacity="0.95" stroke="#e7298a" stroke-width="2"><title>Pred interval 10: silent; GT=interrupt; Pred=silent; PPL=1.095</title></rect>
+<line x1="786.11" y1="99.50" x2="796.11" y2="109.50" stroke="#ffffff" stroke-width="2"/>
+<line x1="796.11" y1="99.50" x2="786.11" y2="109.50" stroke="#ffffff" stroke-width="2"/>
+<rect x="984.98" y="92" width="31.02" height="25" rx="4" fill="#1b9e77" opacity="0.95" stroke="#e7298a" stroke-width="2"><title>Pred interval 11: silent; GT=interrupt; Pred=silent; PPL=1.067</title></rect>
+<line x1="995.49" y1="99.50" x2="1005.49" y2="109.50" stroke="#ffffff" stroke-width="2"/>
+<line x1="1005.49" y1="99.50" x2="995.49" y2="109.50" stroke="#ffffff" stroke-width="2"/>
+</svg>
+                <div class="table-wrap">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>#</th><th>Interval</th><th>Frames</th><th>Times</th><th>Sample preds</th><th>Votes</th>
+                        <th>GT</th><th>Pred</th><th>Correct</th><th>PPL</th><th>Gate</th>
+                        <th>GT answer</th><th>Generated text</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr class="ok"><td>0</td><td>0.0-1.9s</td><td>4, 11, 18, 25</td><td>0.27, 0.73, 1.20, 1.67</td><td>interrupt, interrupt, silent, silent</td><td>2 int / 2 sil</td><td><span class="pill interrupt">interrupt</span></td><td><span class="pill interrupt">interrupt</span></td><td>yes</td><td>1.028</td><td>1.108</td><td>Grab that roll of athletic tape and set it handy on the table—ready to go!</td><td>The person is not wrapping their wrist with athletic tape. | The person is not wrapping their wrist with athletic tape.</td></tr>
+<tr class="ok"><td>1</td><td>1.9-14.7s</td><td>52, 100, 148, 196</td><td>3.47, 6.67, 9.87, 13.07</td><td>interrupt, silent, interrupt, silent</td><td>2 int / 2 sil</td><td><span class="pill interrupt">interrupt</span></td><td><span class="pill interrupt">interrupt</span></td><td>yes</td><td>1.064</td><td>1.155</td><td>Unroll about six inches of tape—just enough to get started!</td><td>The person is wrapping their wrist with athletic tape. | The person is wrapping their wrist with athletic tape.</td></tr>
+<tr class="ok"><td>2</td><td>14.7-17.6s</td><td>226, 237, 248, 259</td><td>15.07, 15.80, 16.53, 17.27</td><td>silent, silent, interrupt, silent</td><td>1 int / 3 sil</td><td><span class="pill interrupt">interrupt</span></td><td><span class="pill interrupt">interrupt</span></td><td>yes</td><td>1.178</td><td>1.217</td><td>Grab your scissors and tear off that anchor strip of tape—ready to go!</td><td>The person is wrapping their wrist with athletic tape.</td></tr>
+<tr class="bad"><td>3</td><td>17.6-27.2s</td><td>282, 318, 354, 390</td><td>18.80, 21.20, 23.60, 26.00</td><td>silent, silent, silent, silent</td><td>0 int / 4 sil</td><td><span class="pill interrupt">interrupt</span></td><td><span class="pill silent">silent</span></td><td>no</td><td>1.128</td><td>1.217</td><td>Trim that tape to size, then pop the scissors and roll back on the table.</td><td></td></tr>
+<tr class="bad"><td>4</td><td>27.2-30.1s</td><td>413, 424, 435, 446</td><td>27.53, 28.27, 29.00, 29.73</td><td>silent, silent, silent, silent</td><td>0 int / 4 sil</td><td><span class="pill interrupt">interrupt</span></td><td><span class="pill silent">silent</span></td><td>no</td><td>1.065</td><td>1.217</td><td>Quick heads-up: Take off any jewelry—like your watch—from your wrist before we start.</td><td></td></tr>
+<tr class="bad"><td>5</td><td>30.1-36.0s</td><td>463, 485, 507, 529</td><td>30.87, 32.33, 33.80, 35.27</td><td>silent, silent, silent, silent</td><td>0 int / 4 sil</td><td><span class="pill interrupt">interrupt</span></td><td><span class="pill silent">silent</span></td><td>no</td><td>1.041</td><td>1.217</td><td>Nice cozy setup! Just a quick reminder—let’s get that watch off first so we can start taping your wrist. You’ve got this!</td><td></td></tr>
+<tr class="bad"><td>6</td><td>36.0-40.8s</td><td>549, 567, 585, 603</td><td>36.60, 37.80, 39.00, 40.20</td><td>silent, silent, silent, silent</td><td>0 int / 4 sil</td><td><span class="pill interrupt">interrupt</span></td><td><span class="pill silent">silent</span></td><td>no</td><td>1.069</td><td>1.217</td><td>Grab the tape roll and start unwinding it—let’s get wrapping!</td><td></td></tr>
+<tr class="bad"><td>7</td><td>40.8-65.6s</td><td>658, 751, 844, 937</td><td>43.87, 50.07, 56.27, 62.47</td><td>silent, silent, silent, silent</td><td>0 int / 4 sil</td><td><span class="pill interrupt">interrupt</span></td><td><span class="pill silent">silent</span></td><td>no</td><td>1.055</td><td>1.217</td><td>Keep unrolling the tape, stretch it out, cut it to size, then lay it flat on the table.</td><td></td></tr>
+<tr class="bad"><td>8</td><td>65.6-79.2s</td><td>1010, 1060, 1112, 1162</td><td>67.33, 70.67, 74.13, 77.47</td><td>silent, silent, silent, silent</td><td>0 int / 4 sil</td><td><span class="pill interrupt">interrupt</span></td><td><span class="pill silent">silent</span></td><td>no</td><td>1.099</td><td>1.217</td><td>Cut another strip of tape—same size as before!</td><td></td></tr>
+<tr class="bad"><td>9</td><td>79.2-89.0s</td><td>1206, 1243, 1280, 1317</td><td>80.40, 82.87, 85.33, 87.80</td><td>silent, silent, silent, silent</td><td>0 int / 4 sil</td><td><span class="pill interrupt">interrupt</span></td><td><span class="pill silent">silent</span></td><td>no</td><td>1.056</td><td>1.217</td><td>Wrap that anchor strip snug around your wrist, then start layering the first overlapping strip right on top.</td><td></td></tr>
+<tr class="bad"><td>10</td><td>89.0-156.5s</td><td>1462, 1715, 1968, 2221</td><td>97.47, 114.33, 131.20, 148.07</td><td>silent, silent, silent, silent</td><td>0 int / 4 sil</td><td><span class="pill interrupt">interrupt</span></td><td><span class="pill silent">silent</span></td><td>no</td><td>1.095</td><td>1.217</td><td>Wrap 3–4 more strips in a spiral, overlapping each one and pressing the ends firmly to lock it in place.</td><td></td></tr>
+<tr class="bad"><td>11</td><td>156.5-161.9s</td><td>2358, 2378, 2398, 2418</td><td>157.20, 158.53, 159.87, 161.20</td><td>silent, silent, silent, silent</td><td>0 int / 4 sil</td><td><span class="pill interrupt">interrupt</span></td><td><span class="pill silent">silent</span></td><td>no</td><td>1.067</td><td>1.217</td><td>Give your wrist a gentle flex to test the wrap—tweak it if needed!</td><td></td></tr>
+                    </tbody>
+                  </table>
+                </div>
+              </details>
+            </section>
+            
+            <section class="video-section" id="video-4">
+              <details open>
+                <summary>
+                  <span>4. 0503dacc3da23d1a.mp4</span>
+                  <span class="summary-meta">macro-F1 22.2% | acc 28.6% (2/7) | Arts and Crafts</span>
+                </summary>
+                <div class="video-meta">
+                  <div><strong>Task:</strong> Decorating a sketchbook with stickers</div>
+                  <div><strong>Query:</strong> How do I decorate a sketchbook with stickers?</div>
+                  <div><strong>Video:</strong> <a href="videos/0503dacc3da23d1a.mp4">videos/0503dacc3da23d1a.mp4</a></div>
+                  <div><code>/data1/wearable_ai_challenge_data/egoproactive/val/0503dacc3da23d1a.mp4</code></div>
+                </div>
+                <video class="video-player" controls preload="metadata" src="videos/0503dacc3da23d1a.mp4"></video>
+                <svg viewBox="0 0 1040 156" class="timeline" role="img" aria-label="Timeline for 0503dacc3da23d1a.mp4">
+<text x="86" y="24" class="svg-axis">0503dacc3da23d1a.mp4</text>
+<text x="18" y="65" class="svg-axis">GT</text>
+<text x="18" y="109" class="svg-axis">Pred</text>
+<line x1="86.0" y1="36" x2="86.0" y2="124" stroke="#d8dee9"/>
+<text x="86.0" y="146" text-anchor="middle" class="svg-muted">0s</text>
+<line x1="272.0" y1="36" x2="272.0" y2="124" stroke="#d8dee9"/>
+<text x="272.0" y="146" text-anchor="middle" class="svg-muted">42s</text>
+<line x1="458.0" y1="36" x2="458.0" y2="124" stroke="#d8dee9"/>
+<text x="458.0" y="146" text-anchor="middle" class="svg-muted">84s</text>
+<line x1="644.0000000000001" y1="36" x2="644.0000000000001" y2="124" stroke="#d8dee9"/>
+<text x="644.0000000000001" y="146" text-anchor="middle" class="svg-muted">126s</text>
+<line x1="830.0" y1="36" x2="830.0" y2="124" stroke="#d8dee9"/>
+<text x="830.0" y="146" text-anchor="middle" class="svg-muted">168s</text>
+<line x1="1016.0" y1="36" x2="1016.0" y2="124" stroke="#d8dee9"/>
+<text x="1016.0" y="146" text-anchor="middle" class="svg-muted">210s</text>
+<rect x="86.00" y="48" width="8.87" height="25" rx="4" fill="#d95f02" opacity="0.72" stroke="#ffffff" stroke-width="1"><title>GT interval 0: interrupt; GT=interrupt; Pred=interrupt; PPL=1.021</title></rect>
+<rect x="95.31" y="48" width="11.97" height="25" rx="4" fill="#d95f02" opacity="0.72" stroke="#ffffff" stroke-width="1"><title>GT interval 1: interrupt; GT=interrupt; Pred=silent; PPL=1.102</title></rect>
+<rect x="107.28" y="48" width="254.00" height="25" rx="4" fill="#d95f02" opacity="0.72" stroke="#ffffff" stroke-width="1"><title>GT interval 2: interrupt; GT=interrupt; Pred=interrupt; PPL=1.022</title></rect>
+<rect x="361.28" y="48" width="11.97" height="25" rx="4" fill="#d95f02" opacity="0.72" stroke="#ffffff" stroke-width="1"><title>GT interval 3: interrupt; GT=interrupt; Pred=silent; PPL=1.036</title></rect>
+<rect x="373.24" y="48" width="386.10" height="25" rx="4" fill="#d95f02" opacity="0.72" stroke="#ffffff" stroke-width="1"><title>GT interval 4: interrupt; GT=interrupt; Pred=silent; PPL=1.049</title></rect>
+<rect x="759.34" y="48" width="13.30" height="25" rx="4" fill="#d95f02" opacity="0.72" stroke="#ffffff" stroke-width="1"><title>GT interval 5: interrupt; GT=interrupt; Pred=silent; PPL=1.034</title></rect>
+<rect x="772.64" y="48" width="243.36" height="25" rx="4" fill="#d95f02" opacity="0.72" stroke="#ffffff" stroke-width="1"><title>GT interval 6: interrupt; GT=interrupt; Pred=silent; PPL=1.035</title></rect>
+<rect x="86.00" y="92" width="8.87" height="25" rx="4" fill="#d95f02" opacity="0.95" stroke="#ffffff" stroke-width="1"><title>Pred interval 0: interrupt; GT=interrupt; Pred=interrupt; PPL=1.021</title></rect>
+<rect x="95.31" y="92" width="11.97" height="25" rx="4" fill="#1b9e77" opacity="0.95" stroke="#e7298a" stroke-width="2"><title>Pred interval 1: silent; GT=interrupt; Pred=silent; PPL=1.102</title></rect>
+<line x1="96.29" y1="99.50" x2="106.29" y2="109.50" stroke="#ffffff" stroke-width="2"/>
+<line x1="106.29" y1="99.50" x2="96.29" y2="109.50" stroke="#ffffff" stroke-width="2"/>
+<rect x="107.28" y="92" width="254.00" height="25" rx="4" fill="#d95f02" opacity="0.95" stroke="#ffffff" stroke-width="1"><title>Pred interval 2: interrupt; GT=interrupt; Pred=interrupt; PPL=1.022</title></rect>
+<rect x="361.28" y="92" width="11.97" height="25" rx="4" fill="#1b9e77" opacity="0.95" stroke="#e7298a" stroke-width="2"><title>Pred interval 3: silent; GT=interrupt; Pred=silent; PPL=1.036</title></rect>
+<line x1="362.26" y1="99.50" x2="372.26" y2="109.50" stroke="#ffffff" stroke-width="2"/>
+<line x1="372.26" y1="99.50" x2="362.26" y2="109.50" stroke="#ffffff" stroke-width="2"/>
+<rect x="373.24" y="92" width="386.10" height="25" rx="4" fill="#1b9e77" opacity="0.95" stroke="#e7298a" stroke-width="2"><title>Pred interval 4: silent; GT=interrupt; Pred=silent; PPL=1.049</title></rect>
+<line x1="561.29" y1="99.50" x2="571.29" y2="109.50" stroke="#ffffff" stroke-width="2"/>
+<line x1="571.29" y1="99.50" x2="561.29" y2="109.50" stroke="#ffffff" stroke-width="2"/>
+<rect x="759.34" y="92" width="13.30" height="25" rx="4" fill="#1b9e77" opacity="0.95" stroke="#e7298a" stroke-width="2"><title>Pred interval 5: silent; GT=interrupt; Pred=silent; PPL=1.034</title></rect>
+<line x1="760.99" y1="99.50" x2="770.99" y2="109.50" stroke="#ffffff" stroke-width="2"/>
+<line x1="770.99" y1="99.50" x2="760.99" y2="109.50" stroke="#ffffff" stroke-width="2"/>
+<rect x="772.64" y="92" width="243.36" height="25" rx="4" fill="#1b9e77" opacity="0.95" stroke="#e7298a" stroke-width="2"><title>Pred interval 6: silent; GT=interrupt; Pred=silent; PPL=1.035</title></rect>
+<line x1="889.32" y1="99.50" x2="899.32" y2="109.50" stroke="#ffffff" stroke-width="2"/>
+<line x1="899.32" y1="99.50" x2="889.32" y2="109.50" stroke="#ffffff" stroke-width="2"/>
+</svg>
+                <div class="table-wrap">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>#</th><th>Interval</th><th>Frames</th><th>Times</th><th>Sample preds</th><th>Votes</th>
+                        <th>GT</th><th>Pred</th><th>Correct</th><th>PPL</th><th>Gate</th>
+                        <th>GT answer</th><th>Generated text</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr class="ok"><td>0</td><td>0.0-2.0s</td><td>4, 11, 19, 26</td><td>0.27, 0.73, 1.27, 1.73</td><td>interrupt, interrupt, interrupt, silent</td><td>3 int / 1 sil</td><td><span class="pill interrupt">interrupt</span></td><td><span class="pill interrupt">interrupt</span></td><td>yes</td><td>1.021</td><td>1.104</td><td>Flip to a fresh page in your sketchbook — let’s get started!</td><td>The person is not decorating the sketchbook. | The person is not decorating the sketchbook. | The person is not decorating the sketchbook.</td></tr>
+<tr class="bad"><td>1</td><td>2.1-4.8s</td><td>37, 47, 57, 67</td><td>2.47, 3.13, 3.80, 4.47</td><td>silent, silent, silent, silent</td><td>0 int / 4 sil</td><td><span class="pill interrupt">interrupt</span></td><td><span class="pill silent">silent</span></td><td>no</td><td>1.102</td><td>1.104</td><td>Alright, just nudge the notebook into place on the tray and grab those stickers — you’re all set to start decorating!</td><td></td></tr>
+<tr class="ok"><td>2</td><td>4.8-62.1s</td><td>179, 394, 609, 824</td><td>11.93, 26.27, 40.60, 54.93</td><td>silent, interrupt, silent, silent</td><td>1 int / 3 sil</td><td><span class="pill interrupt">interrupt</span></td><td><span class="pill interrupt">interrupt</span></td><td>yes</td><td>1.022</td><td>1.101</td><td>Time to lay out your stickers on the page—play around with the arrangement to plan your design!</td><td>The person is not decorating the sketchbook.</td></tr>
+<tr class="bad"><td>3</td><td>62.1-64.8s</td><td>937, 947, 957, 967</td><td>62.47, 63.13, 63.80, 64.47</td><td>silent, silent, silent, silent</td><td>0 int / 4 sil</td><td><span class="pill interrupt">interrupt</span></td><td><span class="pill silent">silent</span></td><td>no</td><td>1.036</td><td>1.101</td><td>Peel the backing off your sticker, nudge it into just the right spot, then stick it down!</td><td></td></tr>
+<tr class="bad"><td>4</td><td>64.8-151.9s</td><td>1135, 1462, 1789, 2115</td><td>75.67, 97.47, 119.27, 141.00</td><td>silent, silent, silent, silent</td><td>0 int / 4 sil</td><td><span class="pill interrupt">interrupt</span></td><td><span class="pill silent">silent</span></td><td>no</td><td>1.049</td><td>1.101</td><td>Gently press each sticker down with your finger—smooth it out so no bubbles sneak in!</td><td></td></tr>
+<tr class="bad"><td>5</td><td>151.9-154.9s</td><td>2284, 2295, 2307, 2318</td><td>152.27, 153.00, 153.80, 154.53</td><td>silent, silent, silent, silent</td><td>0 int / 4 sil</td><td><span class="pill interrupt">interrupt</span></td><td><span class="pill silent">silent</span></td><td>no</td><td>1.034</td><td>1.101</td><td>Time to tidy up—peel off any stickers that aren’t quite right, give the tray a quick wipe, then shuffle them into their perfect final spots!</td><td></td></tr>
+<tr class="bad"><td>6</td><td>154.9-209.8s</td><td>2426, 2632, 2838, 3044</td><td>161.73, 175.47, 189.20, 202.93</td><td>silent, silent, silent, silent</td><td>0 int / 4 sil</td><td><span class="pill interrupt">interrupt</span></td><td><span class="pill silent">silent</span></td><td>no</td><td>1.035</td><td>1.101</td><td>Keep going—stick on the rest and tweak each one till it’s just right!</td><td></td></tr>
+                    </tbody>
+                  </table>
+                </div>
+              </details>
+            </section>
+            
+            <section class="video-section" id="video-5">
+              <details open>
+                <summary>
+                  <span>5. 71202dd2f453c9f3.mp4</span>
+                  <span class="summary-meta">macro-F1 23.1% | acc 30.0% (3/10) | Handyman</span>
+                </summary>
+                <div class="video-meta">
+                  <div><strong>Task:</strong> Tightening loose table legs</div>
+                  <div><strong>Query:</strong> How do I tighten loose table legs?</div>
+                  <div><strong>Video:</strong> <a href="videos/71202dd2f453c9f3.mp4">videos/71202dd2f453c9f3.mp4</a></div>
+                  <div><code>/data1/wearable_ai_challenge_data/egoproactive/val/71202dd2f453c9f3.mp4</code></div>
+                </div>
+                <video class="video-player" controls preload="metadata" src="videos/71202dd2f453c9f3.mp4"></video>
+                <svg viewBox="0 0 1040 156" class="timeline" role="img" aria-label="Timeline for 71202dd2f453c9f3.mp4">
+<text x="86" y="24" class="svg-axis">71202dd2f453c9f3.mp4</text>
+<text x="18" y="65" class="svg-axis">GT</text>
+<text x="18" y="109" class="svg-axis">Pred</text>
+<line x1="86.0" y1="36" x2="86.0" y2="124" stroke="#d8dee9"/>
+<text x="86.0" y="146" text-anchor="middle" class="svg-muted">0s</text>
+<line x1="272.0" y1="36" x2="272.0" y2="124" stroke="#d8dee9"/>
+<text x="272.0" y="146" text-anchor="middle" class="svg-muted">23s</text>
+<line x1="458.0" y1="36" x2="458.0" y2="124" stroke="#d8dee9"/>
+<text x="458.0" y="146" text-anchor="middle" class="svg-muted">47s</text>
+<line x1="643.9999999999999" y1="36" x2="643.9999999999999" y2="124" stroke="#d8dee9"/>
+<text x="643.9999999999999" y="146" text-anchor="middle" class="svg-muted">70s</text>
+<line x1="830.0" y1="36" x2="830.0" y2="124" stroke="#d8dee9"/>
+<text x="830.0" y="146" text-anchor="middle" class="svg-muted">94s</text>
+<line x1="1016.0" y1="36" x2="1016.0" y2="124" stroke="#d8dee9"/>
+<text x="1016.0" y="146" text-anchor="middle" class="svg-muted">117s</text>
+<rect x="86.00" y="48" width="15.88" height="25" rx="4" fill="#d95f02" opacity="0.72" stroke="#ffffff" stroke-width="1"><title>GT interval 0: interrupt; GT=interrupt; Pred=interrupt; PPL=1.613</title></rect>
+<rect x="101.88" y="48" width="41.30" height="25" rx="4" fill="#1b9e77" opacity="0.72" stroke="#ffffff" stroke-width="1"><title>GT interval 1: silent; GT=silent; Pred=interrupt; PPL=1.399</title></rect>
+<rect x="143.18" y="48" width="63.54" height="25" rx="4" fill="#d95f02" opacity="0.72" stroke="#ffffff" stroke-width="1"><title>GT interval 2: interrupt; GT=interrupt; Pred=silent; PPL=1.265</title></rect>
+<rect x="206.72" y="48" width="61.95" height="25" rx="4" fill="#d95f02" opacity="0.72" stroke="#ffffff" stroke-width="1"><title>GT interval 3: interrupt; GT=interrupt; Pred=interrupt; PPL=1.267</title></rect>
+<rect x="291.70" y="48" width="63.54" height="25" rx="4" fill="#d95f02" opacity="0.72" stroke="#ffffff" stroke-width="1"><title>GT interval 4: interrupt; GT=interrupt; Pred=silent; PPL=1.267</title></rect>
+<rect x="355.23" y="48" width="63.54" height="25" rx="4" fill="#1b9e77" opacity="0.72" stroke="#ffffff" stroke-width="1"><title>GT interval 5: silent; GT=silent; Pred=interrupt; PPL=1.313</title></rect>
+<rect x="609.37" y="48" width="63.54" height="25" rx="4" fill="#1b9e77" opacity="0.72" stroke="#ffffff" stroke-width="1"><title>GT interval 6: silent; GT=silent; Pred=interrupt; PPL=1.323</title></rect>
+<rect x="863.51" y="48" width="25.41" height="25" rx="4" fill="#1b9e77" opacity="0.72" stroke="#ffffff" stroke-width="1"><title>GT interval 7: silent; GT=silent; Pred=interrupt; PPL=1.297</title></rect>
+<rect x="888.93" y="48" width="63.54" height="25" rx="4" fill="#d95f02" opacity="0.72" stroke="#ffffff" stroke-width="1"><title>GT interval 8: interrupt; GT=interrupt; Pred=interrupt; PPL=1.293</title></rect>
+<rect x="952.46" y="48" width="63.54" height="25" rx="4" fill="#1b9e77" opacity="0.72" stroke="#ffffff" stroke-width="1"><title>GT interval 9: silent; GT=silent; Pred=interrupt; PPL=1.240</title></rect>
+<rect x="86.00" y="92" width="15.88" height="25" rx="4" fill="#d95f02" opacity="0.95" stroke="#ffffff" stroke-width="1"><title>Pred interval 0: interrupt; GT=interrupt; Pred=interrupt; PPL=1.613</title></rect>
+<rect x="101.88" y="92" width="41.30" height="25" rx="4" fill="#d95f02" opacity="0.95" stroke="#e7298a" stroke-width="2"><title>Pred interval 1: interrupt; GT=silent; Pred=interrupt; PPL=1.399</title></rect>
+<line x1="117.53" y1="99.50" x2="127.53" y2="109.50" stroke="#ffffff" stroke-width="2"/>
+<line x1="127.53" y1="99.50" x2="117.53" y2="109.50" stroke="#ffffff" stroke-width="2"/>
+<rect x="143.18" y="92" width="63.54" height="25" rx="4" fill="#1b9e77" opacity="0.95" stroke="#e7298a" stroke-width="2"><title>Pred interval 2: silent; GT=interrupt; Pred=silent; PPL=1.265</title></rect>
+<line x1="169.95" y1="99.50" x2="179.95" y2="109.50" stroke="#ffffff" stroke-width="2"/>
+<line x1="179.95" y1="99.50" x2="169.95" y2="109.50" stroke="#ffffff" stroke-width="2"/>
+<rect x="206.72" y="92" width="61.95" height="25" rx="4" fill="#d95f02" opacity="0.95" stroke="#ffffff" stroke-width="1"><title>Pred interval 3: interrupt; GT=interrupt; Pred=interrupt; PPL=1.267</title></rect>
+<rect x="291.70" y="92" width="63.54" height="25" rx="4" fill="#1b9e77" opacity="0.95" stroke="#e7298a" stroke-width="2"><title>Pred interval 4: silent; GT=interrupt; Pred=silent; PPL=1.267</title></rect>
+<line x1="318.46" y1="99.50" x2="328.46" y2="109.50" stroke="#ffffff" stroke-width="2"/>
+<line x1="328.46" y1="99.50" x2="318.46" y2="109.50" stroke="#ffffff" stroke-width="2"/>
+<rect x="355.23" y="92" width="63.54" height="25" rx="4" fill="#d95f02" opacity="0.95" stroke="#e7298a" stroke-width="2"><title>Pred interval 5: interrupt; GT=silent; Pred=interrupt; PPL=1.313</title></rect>
+<line x1="382.00" y1="99.50" x2="392.00" y2="109.50" stroke="#ffffff" stroke-width="2"/>
+<line x1="392.00" y1="99.50" x2="382.00" y2="109.50" stroke="#ffffff" stroke-width="2"/>
+<rect x="609.37" y="92" width="63.54" height="25" rx="4" fill="#d95f02" opacity="0.95" stroke="#e7298a" stroke-width="2"><title>Pred interval 6: interrupt; GT=silent; Pred=interrupt; PPL=1.323</title></rect>
+<line x1="636.14" y1="99.50" x2="646.14" y2="109.50" stroke="#ffffff" stroke-width="2"/>
+<line x1="646.14" y1="99.50" x2="636.14" y2="109.50" stroke="#ffffff" stroke-width="2"/>
+<rect x="863.51" y="92" width="25.41" height="25" rx="4" fill="#d95f02" opacity="0.95" stroke="#e7298a" stroke-width="2"><title>Pred interval 7: interrupt; GT=silent; Pred=interrupt; PPL=1.297</title></rect>
+<line x1="871.22" y1="99.50" x2="881.22" y2="109.50" stroke="#ffffff" stroke-width="2"/>
+<line x1="881.22" y1="99.50" x2="871.22" y2="109.50" stroke="#ffffff" stroke-width="2"/>
+<rect x="888.93" y="92" width="63.54" height="25" rx="4" fill="#d95f02" opacity="0.95" stroke="#ffffff" stroke-width="1"><title>Pred interval 8: interrupt; GT=interrupt; Pred=interrupt; PPL=1.293</title></rect>
+<rect x="952.46" y="92" width="63.54" height="25" rx="4" fill="#d95f02" opacity="0.95" stroke="#e7298a" stroke-width="2"><title>Pred interval 9: interrupt; GT=silent; Pred=interrupt; PPL=1.240</title></rect>
+<line x1="979.23" y1="99.50" x2="989.23" y2="109.50" stroke="#ffffff" stroke-width="2"/>
+<line x1="989.23" y1="99.50" x2="979.23" y2="109.50" stroke="#ffffff" stroke-width="2"/>
+</svg>
+                <div class="table-wrap">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>#</th><th>Interval</th><th>Frames</th><th>Times</th><th>Sample preds</th><th>Votes</th>
+                        <th>GT</th><th>Pred</th><th>Correct</th><th>PPL</th><th>Gate</th>
+                        <th>GT answer</th><th>Generated text</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr class="ok"><td>0</td><td>0.0-2.0s</td><td>4, 11, 19, 26</td><td>0.27, 0.73, 1.27, 1.73</td><td>interrupt, interrupt, silent, interrupt</td><td>3 int / 1 sil</td><td><span class="pill interrupt">interrupt</span></td><td><span class="pill interrupt">interrupt</span></td><td>yes</td><td>1.613</td><td>1.478</td><td>Feel along the table edges to locate the loose leg.</td><td>The table legs are loose. | The table legs are loose. | The camera moves to the right, showing a Christmas tree on the table.</td></tr>
+<tr class="bad"><td>1</td><td>2.0-7.2s</td><td>40, 59, 79, 98</td><td>2.67, 3.93, 5.27, 6.53</td><td>interrupt, interrupt, silent, interrupt</td><td>3 int / 1 sil</td><td><span class="pill silent">silent</span></td><td><span class="pill interrupt">interrupt</span></td><td>no</td><td>1.399</td><td>1.388</td><td></td><td>Then, a hand reaches out and pulls the tablecloth. | The camera moves to the left, showing a hand pulling the tablecloth. | Then, the camera moves to the right, showing a hand p...</td></tr>
+<tr class="bad"><td>2</td><td>7.2-15.2s</td><td>123, 153, 183, 213</td><td>8.20, 10.20, 12.20, 14.20</td><td>silent, silent, silent, silent</td><td>0 int / 4 sil</td><td><span class="pill interrupt">interrupt</span></td><td><span class="pill silent">silent</span></td><td>no</td><td>1.265</td><td>1.302</td><td>Clear the area around the table—move chairs and anything else out of the way so you can reach the legs easily.</td><td></td></tr>
+<tr class="ok"><td>3</td><td>15.2-23.0s</td><td>243, 272, 301, 330</td><td>16.20, 18.13, 20.07, 22.00</td><td>silent, silent, interrupt, silent</td><td>1 int / 3 sil</td><td><span class="pill interrupt">interrupt</span></td><td><span class="pill interrupt">interrupt</span></td><td>yes</td><td>1.267</td><td>1.326</td><td>Grab that yellow-black wrench and snug up the leg’s bolt—use a chair to steady the table while you tweak the leg’s position!</td><td>The camera moves to the left, showing a hand pulling the tablecloth.</td></tr>
+<tr class="bad"><td>4</td><td>25.9-33.9s</td><td>404, 434, 464, 494</td><td>26.93, 28.93, 30.93, 32.93</td><td>silent, silent, silent, silent</td><td>0 int / 4 sil</td><td><span class="pill interrupt">interrupt</span></td><td><span class="pill silent">silent</span></td><td>no</td><td>1.267</td><td>1.326</td><td>Grab your screwdriver and snug up those leg screws—pop each one into its hole and twist till they’re nice and tight!</td><td></td></tr>
+<tr class="bad"><td>5</td><td>33.9-41.9s</td><td>524, 554, 584, 614</td><td>34.93, 36.93, 38.93, 40.93</td><td>interrupt, silent, silent, silent</td><td>1 int / 3 sil</td><td><span class="pill silent">silent</span></td><td><span class="pill interrupt">interrupt</span></td><td>no</td><td>1.313</td><td>1.323</td><td></td><td>Then, the camera moves to the right, showing a hand pulling the tablecloth.</td></tr>
+<tr class="bad"><td>6</td><td>65.9-73.9s</td><td>1004, 1034, 1064, 1094</td><td>66.93, 68.93, 70.93, 72.93</td><td>interrupt, silent, silent, interrupt</td><td>2 int / 2 sil</td><td><span class="pill silent">silent</span></td><td><span class="pill interrupt">interrupt</span></td><td>no</td><td>1.323</td><td>1.321</td><td></td><td>The camera moves to the left, showing a hand pulling the tablecloth. | The camera moves to the right, showing a hand pulling the tablecloth.</td></tr>
+<tr class="bad"><td>7</td><td>97.9-101.1s</td><td>1475, 1486, 1498, 1510</td><td>98.33, 99.07, 99.87, 100.67</td><td>silent, silent, interrupt, silent</td><td>1 int / 3 sil</td><td><span class="pill silent">silent</span></td><td><span class="pill interrupt">interrupt</span></td><td>no</td><td>1.297</td><td>1.325</td><td></td><td>The camera moves to the left, showing a hand pulling the tablecloth.</td></tr>
+<tr class="ok"><td>8</td><td>101.1-109.1s</td><td>1532, 1562, 1592, 1622</td><td>102.13, 104.13, 106.13, 108.13</td><td>silent, silent, interrupt, silent</td><td>1 int / 3 sil</td><td><span class="pill interrupt">interrupt</span></td><td><span class="pill interrupt">interrupt</span></td><td>yes</td><td>1.293</td><td>1.332</td><td>Give the table a gentle wiggle—if it wobbles, tuck a folded piece of paper or cardboard under that leg to steady it.</td><td>The camera moves to the right, showing a hand pulling the tablecloth.</td></tr>
+<tr class="bad"><td>9</td><td>109.1-117.1s</td><td>1652, 1682, 1712, 1742</td><td>110.13, 112.13, 114.13, 116.13</td><td>silent, interrupt, interrupt, silent</td><td>2 int / 2 sil</td><td><span class="pill silent">silent</span></td><td><span class="pill interrupt">interrupt</span></td><td>no</td><td>1.240</td><td>1.363</td><td></td><td>Finally, the camera moves to the left, showing a hand pulling the tablecloth. | The camera moves to the right, showing a hand pulling the tablecloth.</td></tr>
+                    </tbody>
+                  </table>
+                </div>
+              </details>
+            </section>
+            
+            <section class="video-section" id="video-6">
+              <details open>
+                <summary>
+                  <span>6. b2987e9e55bb694b.mp4</span>
+                  <span class="summary-meta">macro-F1 25.0% | acc 33.3% (2/6) | Tutorial</span>
+                </summary>
+                <div class="video-meta">
+                  <div><strong>Task:</strong> How to adjust a bicycle seat height</div>
+                  <div><strong>Query:</strong> How do I adjust a bicycle seat height?</div>
+                  <div><strong>Video:</strong> <a href="videos/b2987e9e55bb694b.mp4">videos/b2987e9e55bb694b.mp4</a></div>
+                  <div><code>/data1/wearable_ai_challenge_data/egoproactive/val/b2987e9e55bb694b.mp4</code></div>
+                </div>
+                <video class="video-player" controls preload="metadata" src="videos/b2987e9e55bb694b.mp4"></video>
+                <svg viewBox="0 0 1040 156" class="timeline" role="img" aria-label="Timeline for b2987e9e55bb694b.mp4">
+<text x="86" y="24" class="svg-axis">b2987e9e55bb694b.mp4</text>
+<text x="18" y="65" class="svg-axis">GT</text>
+<text x="18" y="109" class="svg-axis">Pred</text>
+<line x1="86.0" y1="36" x2="86.0" y2="124" stroke="#d8dee9"/>
+<text x="86.0" y="146" text-anchor="middle" class="svg-muted">0s</text>
+<line x1="272.0" y1="36" x2="272.0" y2="124" stroke="#d8dee9"/>
+<text x="272.0" y="146" text-anchor="middle" class="svg-muted">22s</text>
+<line x1="458.0" y1="36" x2="458.0" y2="124" stroke="#d8dee9"/>
+<text x="458.0" y="146" text-anchor="middle" class="svg-muted">45s</text>
+<line x1="644.0" y1="36" x2="644.0" y2="124" stroke="#d8dee9"/>
+<text x="644.0" y="146" text-anchor="middle" class="svg-muted">67s</text>
+<line x1="830.0" y1="36" x2="830.0" y2="124" stroke="#d8dee9"/>
+<text x="830.0" y="146" text-anchor="middle" class="svg-muted">90s</text>
+<line x1="1016.0" y1="36" x2="1016.0" y2="124" stroke="#d8dee9"/>
+<text x="1016.0" y="146" text-anchor="middle" class="svg-muted">112s</text>
+<rect x="86.00" y="48" width="16.58" height="25" rx="4" fill="#d95f02" opacity="0.72" stroke="#ffffff" stroke-width="1"><title>GT interval 0: interrupt; GT=interrupt; Pred=interrupt; PPL=1.238</title></rect>
+<rect x="105.89" y="48" width="107.75" height="25" rx="4" fill="#d95f02" opacity="0.72" stroke="#ffffff" stroke-width="1"><title>GT interval 1: interrupt; GT=interrupt; Pred=interrupt; PPL=1.056</title></rect>
+<rect x="213.65" y="48" width="38.13" height="25" rx="4" fill="#d95f02" opacity="0.72" stroke="#ffffff" stroke-width="1"><title>GT interval 2: interrupt; GT=interrupt; Pred=silent; PPL=1.053</title></rect>
+<rect x="251.78" y="48" width="443.45" height="25" rx="4" fill="#d95f02" opacity="0.72" stroke="#ffffff" stroke-width="1"><title>GT interval 3: interrupt; GT=interrupt; Pred=silent; PPL=1.055</title></rect>
+<rect x="695.22" y="48" width="287.62" height="25" rx="4" fill="#d95f02" opacity="0.72" stroke="#ffffff" stroke-width="1"><title>GT interval 4: interrupt; GT=interrupt; Pred=silent; PPL=1.063</title></rect>
+<rect x="982.84" y="48" width="33.16" height="25" rx="4" fill="#d95f02" opacity="0.72" stroke="#ffffff" stroke-width="1"><title>GT interval 5: interrupt; GT=interrupt; Pred=silent; PPL=1.064</title></rect>
+<rect x="86.00" y="92" width="16.58" height="25" rx="4" fill="#d95f02" opacity="0.95" stroke="#ffffff" stroke-width="1"><title>Pred interval 0: interrupt; GT=interrupt; Pred=interrupt; PPL=1.238</title></rect>
+<rect x="105.89" y="92" width="107.75" height="25" rx="4" fill="#d95f02" opacity="0.95" stroke="#ffffff" stroke-width="1"><title>Pred interval 1: interrupt; GT=interrupt; Pred=interrupt; PPL=1.056</title></rect>
+<rect x="213.65" y="92" width="38.13" height="25" rx="4" fill="#1b9e77" opacity="0.95" stroke="#e7298a" stroke-width="2"><title>Pred interval 2: silent; GT=interrupt; Pred=silent; PPL=1.053</title></rect>
+<line x1="227.71" y1="99.50" x2="237.71" y2="109.50" stroke="#ffffff" stroke-width="2"/>
+<line x1="237.71" y1="99.50" x2="227.71" y2="109.50" stroke="#ffffff" stroke-width="2"/>
+<rect x="251.78" y="92" width="443.45" height="25" rx="4" fill="#1b9e77" opacity="0.95" stroke="#e7298a" stroke-width="2"><title>Pred interval 3: silent; GT=interrupt; Pred=silent; PPL=1.055</title></rect>
+<line x1="468.50" y1="99.50" x2="478.50" y2="109.50" stroke="#ffffff" stroke-width="2"/>
+<line x1="478.50" y1="99.50" x2="468.50" y2="109.50" stroke="#ffffff" stroke-width="2"/>
+<rect x="695.22" y="92" width="287.62" height="25" rx="4" fill="#1b9e77" opacity="0.95" stroke="#e7298a" stroke-width="2"><title>Pred interval 4: silent; GT=interrupt; Pred=silent; PPL=1.063</title></rect>
+<line x1="834.03" y1="99.50" x2="844.03" y2="109.50" stroke="#ffffff" stroke-width="2"/>
+<line x1="844.03" y1="99.50" x2="834.03" y2="109.50" stroke="#ffffff" stroke-width="2"/>
+<rect x="982.84" y="92" width="33.16" height="25" rx="4" fill="#1b9e77" opacity="0.95" stroke="#e7298a" stroke-width="2"><title>Pred interval 5: silent; GT=interrupt; Pred=silent; PPL=1.064</title></rect>
+<line x1="994.42" y1="99.50" x2="1004.42" y2="109.50" stroke="#ffffff" stroke-width="2"/>
+<line x1="1004.42" y1="99.50" x2="994.42" y2="109.50" stroke="#ffffff" stroke-width="2"/>
+</svg>
+                <div class="table-wrap">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>#</th><th>Interval</th><th>Frames</th><th>Times</th><th>Sample preds</th><th>Votes</th>
+                        <th>GT</th><th>Pred</th><th>Correct</th><th>PPL</th><th>Gate</th>
+                        <th>GT answer</th><th>Generated text</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr class="ok"><td>0</td><td>0.0-2.0s</td><td>4, 11, 19, 26</td><td>0.27, 0.73, 1.27, 1.73</td><td>interrupt, interrupt, silent, silent</td><td>2 int / 2 sil</td><td><span class="pill interrupt">interrupt</span></td><td><span class="pill interrupt">interrupt</span></td><td>yes</td><td>1.238</td><td>1.295</td><td>Hey, stand beside your bike and take a quick look at the seat post—find that quick-release lever or adjustment bolt. You’ve got this!</td><td>The bicycle seat is at a high position. | The camera moves to the right, and a hand reaches out from the right side of the screen. The hand grabs the handlebar of the bicycle an...</td></tr>
+<tr class="ok"><td>1</td><td>2.4-15.4s</td><td>60, 109, 158, 207</td><td>4.00, 7.27, 10.53, 13.80</td><td>silent, interrupt, interrupt, silent</td><td>2 int / 2 sil</td><td><span class="pill interrupt">interrupt</span></td><td><span class="pill interrupt">interrupt</span></td><td>yes</td><td>1.056</td><td>1.118</td><td>First, open the quick-release lever or loosen the bolt before trying to turn the seat post.</td><td>Then the camera moves to the right, and a hand reaches out from the right side of the screen. The hand grabs the handlebar of the bicycle and pulls it downwards. Then the camera...</td></tr>
+<tr class="bad"><td>2</td><td>15.4-20.0s</td><td>240, 257, 274, 291</td><td>16.00, 17.13, 18.27, 19.40</td><td>silent, silent, silent, silent</td><td>0 int / 4 sil</td><td><span class="pill interrupt">interrupt</span></td><td><span class="pill silent">silent</span></td><td>no</td><td>1.053</td><td>1.118</td><td>Oops — don’t turn the seat post by hand without opening the quick-release lever or loosening the bolt! Fully open the lever or use a wrench to loosen the bolt so the post can sl...</td><td></td></tr>
+<tr class="bad"><td>3</td><td>20.0-73.5s</td><td>400, 601, 802, 1002</td><td>26.67, 40.07, 53.47, 66.80</td><td>silent, silent, silent, silent</td><td>0 int / 4 sil</td><td><span class="pill interrupt">interrupt</span></td><td><span class="pill silent">silent</span></td><td>no</td><td>1.055</td><td>1.118</td><td>Hop on the bike, put one foot on the lowest pedal, and tweak the seat post up or down until your leg’s nearly straight with just a tiny knee bend—then snug that quick-release le...</td><td></td></tr>
+<tr class="bad"><td>4</td><td>73.5-108.2s</td><td>1168, 1298, 1428, 1558</td><td>77.87, 86.53, 95.20, 103.87</td><td>silent, silent, silent, silent</td><td>0 int / 4 sil</td><td><span class="pill interrupt">interrupt</span></td><td><span class="pill silent">silent</span></td><td>no</td><td>1.063</td><td>1.118</td><td>Hop on and ride a bit—check if the seat feels comfy and stays put while you pedal!</td><td></td></tr>
+<tr class="bad"><td>5</td><td>108.2-112.2s</td><td>1630, 1646, 1660, 1676</td><td>108.67, 109.73, 110.67, 111.73</td><td>silent, silent, silent, silent</td><td>0 int / 4 sil</td><td><span class="pill interrupt">interrupt</span></td><td><span class="pill silent">silent</span></td><td>no</td><td>1.064</td><td>1.118</td><td>(test) Stand beside the bike </td><td></td></tr>
+                    </tbody>
+                  </table>
+                </div>
+              </details>
+            </section>
+            
+            <section class="video-section" id="video-7">
+              <details open>
+                <summary>
+                  <span>7. dd0712959a2dc6b0.mp4</span>
+                  <span class="summary-meta">macro-F1 25.0% | acc 33.3% (3/9) | Arts and Crafts</span>
+                </summary>
+                <div class="video-meta">
+                  <div><strong>Task:</strong> Folding an origami elephant face</div>
+                  <div><strong>Query:</strong> How do I fold an origami elephant face?</div>
+                  <div><strong>Video:</strong> <a href="videos/dd0712959a2dc6b0.mp4">videos/dd0712959a2dc6b0.mp4</a></div>
+                  <div><code>/data1/wearable_ai_challenge_data/egoproactive/val/dd0712959a2dc6b0.mp4</code></div>
+                </div>
+                <video class="video-player" controls preload="metadata" src="videos/dd0712959a2dc6b0.mp4"></video>
+                <svg viewBox="0 0 1040 156" class="timeline" role="img" aria-label="Timeline for dd0712959a2dc6b0.mp4">
+<text x="86" y="24" class="svg-axis">dd0712959a2dc6b0.mp4</text>
+<text x="18" y="65" class="svg-axis">GT</text>
+<text x="18" y="109" class="svg-axis">Pred</text>
+<line x1="86.0" y1="36" x2="86.0" y2="124" stroke="#d8dee9"/>
+<text x="86.0" y="146" text-anchor="middle" class="svg-muted">0s</text>
+<line x1="272.0" y1="36" x2="272.0" y2="124" stroke="#d8dee9"/>
+<text x="272.0" y="146" text-anchor="middle" class="svg-muted">40s</text>
+<line x1="458.0" y1="36" x2="458.0" y2="124" stroke="#d8dee9"/>
+<text x="458.0" y="146" text-anchor="middle" class="svg-muted">80s</text>
+<line x1="644.0" y1="36" x2="644.0" y2="124" stroke="#d8dee9"/>
+<text x="644.0" y="146" text-anchor="middle" class="svg-muted">119s</text>
+<line x1="830.0" y1="36" x2="830.0" y2="124" stroke="#d8dee9"/>
+<text x="830.0" y="146" text-anchor="middle" class="svg-muted">159s</text>
+<line x1="1016.0" y1="36" x2="1016.0" y2="124" stroke="#d8dee9"/>
+<text x="1016.0" y="146" text-anchor="middle" class="svg-muted">199s</text>
+<rect x="86.00" y="48" width="2.81" height="25" rx="4" fill="#d95f02" opacity="0.72" stroke="#ffffff" stroke-width="1"><title>GT interval 0: interrupt; GT=interrupt; Pred=interrupt; PPL=1.448</title></rect>
+<rect x="88.81" y="48" width="27.60" height="25" rx="4" fill="#d95f02" opacity="0.72" stroke="#ffffff" stroke-width="1"><title>GT interval 1: interrupt; GT=interrupt; Pred=silent; PPL=1.081</title></rect>
+<rect x="116.41" y="48" width="21.05" height="25" rx="4" fill="#d95f02" opacity="0.72" stroke="#ffffff" stroke-width="1"><title>GT interval 2: interrupt; GT=interrupt; Pred=interrupt; PPL=1.066</title></rect>
+<rect x="137.46" y="48" width="29.00" height="25" rx="4" fill="#d95f02" opacity="0.72" stroke="#ffffff" stroke-width="1"><title>GT interval 3: interrupt; GT=interrupt; Pred=silent; PPL=1.046</title></rect>
+<rect x="166.46" y="48" width="92.16" height="25" rx="4" fill="#d95f02" opacity="0.72" stroke="#ffffff" stroke-width="1"><title>GT interval 4: interrupt; GT=interrupt; Pred=silent; PPL=1.094</title></rect>
+<rect x="258.62" y="48" width="7.95" height="25" rx="4" fill="#d95f02" opacity="0.72" stroke="#ffffff" stroke-width="1"><title>GT interval 5: interrupt; GT=interrupt; Pred=silent; PPL=1.056</title></rect>
+<rect x="266.57" y="48" width="36.02" height="25" rx="4" fill="#d95f02" opacity="0.72" stroke="#ffffff" stroke-width="1"><title>GT interval 6: interrupt; GT=interrupt; Pred=silent; PPL=1.082</title></rect>
+<rect x="302.59" y="48" width="10.29" height="25" rx="4" fill="#d95f02" opacity="0.72" stroke="#ffffff" stroke-width="1"><title>GT interval 7: interrupt; GT=interrupt; Pred=silent; PPL=1.098</title></rect>
+<rect x="312.89" y="48" width="703.11" height="25" rx="4" fill="#d95f02" opacity="0.72" stroke="#ffffff" stroke-width="1"><title>GT interval 8: interrupt; GT=interrupt; Pred=interrupt; PPL=1.414</title></rect>
+<rect x="86.00" y="92" width="2.81" height="25" rx="4" fill="#d95f02" opacity="0.95" stroke="#ffffff" stroke-width="1"><title>Pred interval 0: interrupt; GT=interrupt; Pred=interrupt; PPL=1.448</title></rect>
+<rect x="88.81" y="92" width="27.60" height="25" rx="4" fill="#1b9e77" opacity="0.95" stroke="#e7298a" stroke-width="2"><title>Pred interval 1: silent; GT=interrupt; Pred=silent; PPL=1.081</title></rect>
+<line x1="97.61" y1="99.50" x2="107.61" y2="109.50" stroke="#ffffff" stroke-width="2"/>
+<line x1="107.61" y1="99.50" x2="97.61" y2="109.50" stroke="#ffffff" stroke-width="2"/>
+<rect x="116.41" y="92" width="21.05" height="25" rx="4" fill="#d95f02" opacity="0.95" stroke="#ffffff" stroke-width="1"><title>Pred interval 2: interrupt; GT=interrupt; Pred=interrupt; PPL=1.066</title></rect>
+<rect x="137.46" y="92" width="29.00" height="25" rx="4" fill="#1b9e77" opacity="0.95" stroke="#e7298a" stroke-width="2"><title>Pred interval 3: silent; GT=interrupt; Pred=silent; PPL=1.046</title></rect>
+<line x1="146.96" y1="99.50" x2="156.96" y2="109.50" stroke="#ffffff" stroke-width="2"/>
+<line x1="156.96" y1="99.50" x2="146.96" y2="109.50" stroke="#ffffff" stroke-width="2"/>
+<rect x="166.46" y="92" width="92.16" height="25" rx="4" fill="#1b9e77" opacity="0.95" stroke="#e7298a" stroke-width="2"><title>Pred interval 4: silent; GT=interrupt; Pred=silent; PPL=1.094</title></rect>
+<line x1="207.54" y1="99.50" x2="217.54" y2="109.50" stroke="#ffffff" stroke-width="2"/>
+<line x1="217.54" y1="99.50" x2="207.54" y2="109.50" stroke="#ffffff" stroke-width="2"/>
+<rect x="258.62" y="92" width="7.95" height="25" rx="4" fill="#1b9e77" opacity="0.95" stroke="#e7298a" stroke-width="2"><title>Pred interval 5: silent; GT=interrupt; Pred=silent; PPL=1.056</title></rect>
+<line x1="257.60" y1="99.50" x2="267.60" y2="109.50" stroke="#ffffff" stroke-width="2"/>
+<line x1="267.60" y1="99.50" x2="257.60" y2="109.50" stroke="#ffffff" stroke-width="2"/>
+<rect x="266.57" y="92" width="36.02" height="25" rx="4" fill="#1b9e77" opacity="0.95" stroke="#e7298a" stroke-width="2"><title>Pred interval 6: silent; GT=interrupt; Pred=silent; PPL=1.082</title></rect>
+<line x1="279.58" y1="99.50" x2="289.58" y2="109.50" stroke="#ffffff" stroke-width="2"/>
+<line x1="289.58" y1="99.50" x2="279.58" y2="109.50" stroke="#ffffff" stroke-width="2"/>
+<rect x="302.59" y="92" width="10.29" height="25" rx="4" fill="#1b9e77" opacity="0.95" stroke="#e7298a" stroke-width="2"><title>Pred interval 7: silent; GT=interrupt; Pred=silent; PPL=1.098</title></rect>
+<line x1="302.74" y1="99.50" x2="312.74" y2="109.50" stroke="#ffffff" stroke-width="2"/>
+<line x1="312.74" y1="99.50" x2="302.74" y2="109.50" stroke="#ffffff" stroke-width="2"/>
+<rect x="312.89" y="92" width="703.11" height="25" rx="4" fill="#d95f02" opacity="0.95" stroke="#ffffff" stroke-width="1"><title>Pred interval 8: interrupt; GT=interrupt; Pred=interrupt; PPL=1.414</title></rect>
+</svg>
+                <div class="table-wrap">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>#</th><th>Interval</th><th>Frames</th><th>Times</th><th>Sample preds</th><th>Votes</th>
+                        <th>GT</th><th>Pred</th><th>Correct</th><th>PPL</th><th>Gate</th>
+                        <th>GT answer</th><th>Generated text</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr class="ok"><td>0</td><td>0.0-0.6s</td><td>1, 3, 6, 8</td><td>0.07, 0.20, 0.40, 0.53</td><td>interrupt, interrupt, interrupt, interrupt</td><td>4 int / 0 sil</td><td><span class="pill interrupt">interrupt</span></td><td><span class="pill interrupt">interrupt</span></td><td>yes</td><td>1.448</td><td>1.333</td><td>Got your square sheet? Lay it flat on the surface—ready to fold!</td><td>There is a white table in the picture, with a blue cloth on it. There are some items on the right side of the table. A mobile phone is placed on the table, and there is a pen ne...</td></tr>
+<tr class="bad"><td>1</td><td>0.6-6.5s</td><td>20, 42, 64, 86</td><td>1.33, 2.80, 4.27, 5.73</td><td>silent, silent, silent, silent</td><td>0 int / 4 sil</td><td><span class="pill interrupt">interrupt</span></td><td><span class="pill silent">silent</span></td><td>no</td><td>1.081</td><td>1.144</td><td>Fold your paper diagonally into a triangle, then unfold it—just to make that crease!</td><td></td></tr>
+<tr class="ok"><td>2</td><td>6.5-11.0s</td><td>106, 123, 140, 157</td><td>7.07, 8.20, 9.33, 10.47</td><td>silent, silent, interrupt, silent</td><td>1 int / 3 sil</td><td><span class="pill interrupt">interrupt</span></td><td><span class="pill interrupt">interrupt</span></td><td>yes</td><td>1.066</td><td>1.218</td><td>Gently smooth out the paper first—no folds yet!</td><td>The person folds the origami elephant face again.</td></tr>
+<tr class="bad"><td>3</td><td>11.0-17.2s</td><td>177, 200, 223, 246</td><td>11.80, 13.33, 14.87, 16.40</td><td>silent, silent, silent, silent</td><td>0 int / 4 sil</td><td><span class="pill interrupt">interrupt</span></td><td><span class="pill silent">silent</span></td><td>no</td><td>1.046</td><td>1.218</td><td>Got it — pop-up handled! Now let’s smooth that paper before we start folding. You’ve got this! 🐘</td><td></td></tr>
+<tr class="bad"><td>4</td><td>17.2-36.9s</td><td>295, 369, 443, 517</td><td>19.67, 24.60, 29.53, 34.47</td><td>silent, silent, silent, silent</td><td>0 int / 4 sil</td><td><span class="pill interrupt">interrupt</span></td><td><span class="pill silent">silent</span></td><td>no</td><td>1.094</td><td>1.218</td><td>Time to fold along that last crease—turn it into a triangle!</td><td></td></tr>
+<tr class="bad"><td>5</td><td>36.9-38.6s</td><td>557, 563, 569, 576</td><td>37.13, 37.53, 37.93, 38.40</td><td>silent, silent, silent, silent</td><td>0 int / 4 sil</td><td><span class="pill interrupt">interrupt</span></td><td><span class="pill silent">silent</span></td><td>no</td><td>1.056</td><td>1.218</td><td>Tweak those ear folds and crisp up the creases—almost there!</td><td></td></tr>
+<tr class="bad"><td>6</td><td>38.6-46.3s</td><td>593, 622, 651, 680</td><td>39.53, 41.47, 43.40, 45.33</td><td>silent, silent, silent, silent</td><td>0 int / 4 sil</td><td><span class="pill interrupt">interrupt</span></td><td><span class="pill silent">silent</span></td><td>no</td><td>1.082</td><td>1.218</td><td>Time to fold that bottom point up—let’s start forming the trunk!</td><td></td></tr>
+<tr class="bad"><td>7</td><td>46.3-48.5s</td><td>699, 707, 715, 723</td><td>46.60, 47.13, 47.67, 48.20</td><td>silent, silent, silent, silent</td><td>0 int / 4 sil</td><td><span class="pill interrupt">interrupt</span></td><td><span class="pill silent">silent</span></td><td>no</td><td>1.098</td><td>1.218</td><td>Gently fold the top layer of the trunk down to curve it—almost there!</td><td></td></tr>
+<tr class="ok"><td>8</td><td>48.5-198.8s</td><td>1009, 1573, 2137, 2700</td><td>67.27, 104.87, 142.47, 180.00</td><td>silent, silent, silent, interrupt</td><td>1 int / 3 sil</td><td><span class="pill interrupt">interrupt</span></td><td><span class="pill interrupt">interrupt</span></td><td>yes</td><td>1.414</td><td>1.218</td><td>Wipe the floor with that cloth, then head back to the table to finish your origami elephant.</td><td>The person draws the elephant&#x27;s eyes and ears on the paper.</td></tr>
+                    </tbody>
+                  </table>
+                </div>
+              </details>
+            </section>
+            
+            <section class="video-section" id="video-8">
+              <details open>
+                <summary>
+                  <span>8. 3f83a362bd9e6865.mp4</span>
+                  <span class="summary-meta">macro-F1 25.7% | acc 27.8% (5/18) | Chef</span>
+                </summary>
+                <div class="video-meta">
+                  <div><strong>Task:</strong> Making strawberry and chia yogurt bowl</div>
+                  <div><strong>Query:</strong> How do I make a strawberry and chia yogurt bowl?</div>
+                  <div><strong>Video:</strong> <a href="videos/3f83a362bd9e6865.mp4">videos/3f83a362bd9e6865.mp4</a></div>
+                  <div><code>/data1/wearable_ai_challenge_data/egoproactive/val/3f83a362bd9e6865.mp4</code></div>
+                </div>
+                <video class="video-player" controls preload="metadata" src="videos/3f83a362bd9e6865.mp4"></video>
+                <svg viewBox="0 0 1040 156" class="timeline" role="img" aria-label="Timeline for 3f83a362bd9e6865.mp4">
+<text x="86" y="24" class="svg-axis">3f83a362bd9e6865.mp4</text>
+<text x="18" y="65" class="svg-axis">GT</text>
+<text x="18" y="109" class="svg-axis">Pred</text>
+<line x1="86.0" y1="36" x2="86.0" y2="124" stroke="#d8dee9"/>
+<text x="86.0" y="146" text-anchor="middle" class="svg-muted">0s</text>
+<line x1="272.0" y1="36" x2="272.0" y2="124" stroke="#d8dee9"/>
+<text x="272.0" y="146" text-anchor="middle" class="svg-muted">110s</text>
+<line x1="458.0" y1="36" x2="458.0" y2="124" stroke="#d8dee9"/>
+<text x="458.0" y="146" text-anchor="middle" class="svg-muted">219s</text>
+<line x1="643.9999999999999" y1="36" x2="643.9999999999999" y2="124" stroke="#d8dee9"/>
+<text x="643.9999999999999" y="146" text-anchor="middle" class="svg-muted">329s</text>
+<line x1="830.0" y1="36" x2="830.0" y2="124" stroke="#d8dee9"/>
+<text x="830.0" y="146" text-anchor="middle" class="svg-muted">438s</text>
+<line x1="1016.0" y1="36" x2="1016.0" y2="124" stroke="#d8dee9"/>
+<text x="1016.0" y="146" text-anchor="middle" class="svg-muted">548s</text>
+<rect x="86.00" y="48" width="3.39" height="25" rx="4" fill="#d95f02" opacity="0.72" stroke="#ffffff" stroke-width="1"><title>GT interval 0: interrupt; GT=interrupt; Pred=interrupt; PPL=1.609</title></rect>
+<rect x="89.39" y="48" width="13.58" height="25" rx="4" fill="#1b9e77" opacity="0.72" stroke="#ffffff" stroke-width="1"><title>GT interval 1: silent; GT=silent; Pred=interrupt; PPL=1.469</title></rect>
+<rect x="102.97" y="48" width="13.58" height="25" rx="4" fill="#1b9e77" opacity="0.72" stroke="#ffffff" stroke-width="1"><title>GT interval 2: silent; GT=silent; Pred=interrupt; PPL=1.229</title></rect>
+<rect x="116.55" y="48" width="12.90" height="25" rx="4" fill="#1b9e77" opacity="0.72" stroke="#ffffff" stroke-width="1"><title>GT interval 3: silent; GT=silent; Pred=silent; PPL=1.175</title></rect>
+<rect x="129.45" y="48" width="13.58" height="25" rx="4" fill="#d95f02" opacity="0.72" stroke="#ffffff" stroke-width="1"><title>GT interval 4: interrupt; GT=interrupt; Pred=silent; PPL=1.324</title></rect>
+<rect x="143.03" y="48" width="7.64" height="25" rx="4" fill="#d95f02" opacity="0.72" stroke="#ffffff" stroke-width="1"><title>GT interval 5: interrupt; GT=interrupt; Pred=silent; PPL=1.356</title></rect>
+<rect x="286.46" y="48" width="3.73" height="25" rx="4" fill="#1b9e77" opacity="0.72" stroke="#ffffff" stroke-width="1"><title>GT interval 6: silent; GT=silent; Pred=interrupt; PPL=1.490</title></rect>
+<rect x="290.20" y="48" width="13.58" height="25" rx="4" fill="#d95f02" opacity="0.72" stroke="#ffffff" stroke-width="1"><title>GT interval 7: interrupt; GT=interrupt; Pred=interrupt; PPL=1.275</title></rect>
+<rect x="303.78" y="48" width="13.58" height="25" rx="4" fill="#1b9e77" opacity="0.72" stroke="#ffffff" stroke-width="1"><title>GT interval 8: silent; GT=silent; Pred=interrupt; PPL=1.509</title></rect>
+<rect x="371.67" y="48" width="4.07" height="25" rx="4" fill="#1b9e77" opacity="0.72" stroke="#ffffff" stroke-width="1"><title>GT interval 9: silent; GT=silent; Pred=interrupt; PPL=1.265</title></rect>
+<rect x="375.74" y="48" width="13.58" height="25" rx="4" fill="#d95f02" opacity="0.72" stroke="#ffffff" stroke-width="1"><title>GT interval 10: interrupt; GT=interrupt; Pred=silent; PPL=1.216</title></rect>
+<rect x="449.07" y="48" width="13.58" height="25" rx="4" fill="#d95f02" opacity="0.72" stroke="#ffffff" stroke-width="1"><title>GT interval 11: interrupt; GT=interrupt; Pred=interrupt; PPL=1.168</title></rect>
+<rect x="616.43" y="48" width="13.58" height="25" rx="4" fill="#d95f02" opacity="0.72" stroke="#ffffff" stroke-width="1"><title>GT interval 12: interrupt; GT=interrupt; Pred=silent; PPL=1.149</title></rect>
+<rect x="630.01" y="48" width="13.58" height="25" rx="4" fill="#1b9e77" opacity="0.72" stroke="#ffffff" stroke-width="1"><title>GT interval 13: silent; GT=silent; Pred=interrupt; PPL=1.188</title></rect>
+<rect x="863.07" y="48" width="13.58" height="25" rx="4" fill="#d95f02" opacity="0.72" stroke="#ffffff" stroke-width="1"><title>GT interval 14: interrupt; GT=interrupt; Pred=interrupt; PPL=1.312</title></rect>
+<rect x="985.28" y="48" width="3.56" height="25" rx="4" fill="#1b9e77" opacity="0.72" stroke="#ffffff" stroke-width="1"><title>GT interval 15: silent; GT=silent; Pred=interrupt; PPL=1.228</title></rect>
+<rect x="988.84" y="48" width="13.58" height="25" rx="4" fill="#d95f02" opacity="0.72" stroke="#ffffff" stroke-width="1"><title>GT interval 16: interrupt; GT=interrupt; Pred=silent; PPL=1.343</title></rect>
+<rect x="1002.42" y="48" width="13.58" height="25" rx="4" fill="#1b9e77" opacity="0.72" stroke="#ffffff" stroke-width="1"><title>GT interval 17: silent; GT=silent; Pred=interrupt; PPL=1.185</title></rect>
+<rect x="86.00" y="92" width="3.39" height="25" rx="4" fill="#d95f02" opacity="0.95" stroke="#ffffff" stroke-width="1"><title>Pred interval 0: interrupt; GT=interrupt; Pred=interrupt; PPL=1.609</title></rect>
+<rect x="89.39" y="92" width="13.58" height="25" rx="4" fill="#d95f02" opacity="0.95" stroke="#e7298a" stroke-width="2"><title>Pred interval 1: interrupt; GT=silent; Pred=interrupt; PPL=1.469</title></rect>
+<line x1="91.18" y1="99.50" x2="101.18" y2="109.50" stroke="#ffffff" stroke-width="2"/>
+<line x1="101.18" y1="99.50" x2="91.18" y2="109.50" stroke="#ffffff" stroke-width="2"/>
+<rect x="102.97" y="92" width="13.58" height="25" rx="4" fill="#d95f02" opacity="0.95" stroke="#e7298a" stroke-width="2"><title>Pred interval 2: interrupt; GT=silent; Pred=interrupt; PPL=1.229</title></rect>
+<line x1="104.76" y1="99.50" x2="114.76" y2="109.50" stroke="#ffffff" stroke-width="2"/>
+<line x1="114.76" y1="99.50" x2="104.76" y2="109.50" stroke="#ffffff" stroke-width="2"/>
+<rect x="116.55" y="92" width="12.90" height="25" rx="4" fill="#1b9e77" opacity="0.95" stroke="#ffffff" stroke-width="1"><title>Pred interval 3: silent; GT=silent; Pred=silent; PPL=1.175</title></rect>
+<rect x="129.45" y="92" width="13.58" height="25" rx="4" fill="#1b9e77" opacity="0.95" stroke="#e7298a" stroke-width="2"><title>Pred interval 4: silent; GT=interrupt; Pred=silent; PPL=1.324</title></rect>
+<line x1="131.24" y1="99.50" x2="141.24" y2="109.50" stroke="#ffffff" stroke-width="2"/>
+<line x1="141.24" y1="99.50" x2="131.24" y2="109.50" stroke="#ffffff" stroke-width="2"/>
+<rect x="143.03" y="92" width="7.64" height="25" rx="4" fill="#1b9e77" opacity="0.95" stroke="#e7298a" stroke-width="2"><title>Pred interval 5: silent; GT=interrupt; Pred=silent; PPL=1.356</title></rect>
+<line x1="141.85" y1="99.50" x2="151.85" y2="109.50" stroke="#ffffff" stroke-width="2"/>
+<line x1="151.85" y1="99.50" x2="141.85" y2="109.50" stroke="#ffffff" stroke-width="2"/>
+<rect x="286.46" y="92" width="3.73" height="25" rx="4" fill="#d95f02" opacity="0.95" stroke="#e7298a" stroke-width="2"><title>Pred interval 6: interrupt; GT=silent; Pred=interrupt; PPL=1.490</title></rect>
+<line x1="283.33" y1="99.50" x2="293.33" y2="109.50" stroke="#ffffff" stroke-width="2"/>
+<line x1="293.33" y1="99.50" x2="283.33" y2="109.50" stroke="#ffffff" stroke-width="2"/>
+<rect x="290.20" y="92" width="13.58" height="25" rx="4" fill="#d95f02" opacity="0.95" stroke="#ffffff" stroke-width="1"><title>Pred interval 7: interrupt; GT=interrupt; Pred=interrupt; PPL=1.275</title></rect>
+<rect x="303.78" y="92" width="13.58" height="25" rx="4" fill="#d95f02" opacity="0.95" stroke="#e7298a" stroke-width="2"><title>Pred interval 8: interrupt; GT=silent; Pred=interrupt; PPL=1.509</title></rect>
+<line x1="305.56" y1="99.50" x2="315.56" y2="109.50" stroke="#ffffff" stroke-width="2"/>
+<line x1="315.56" y1="99.50" x2="305.56" y2="109.50" stroke="#ffffff" stroke-width="2"/>
+<rect x="371.67" y="92" width="4.07" height="25" rx="4" fill="#d95f02" opacity="0.95" stroke="#e7298a" stroke-width="2"><title>Pred interval 9: interrupt; GT=silent; Pred=interrupt; PPL=1.265</title></rect>
+<line x1="368.71" y1="99.50" x2="378.71" y2="109.50" stroke="#ffffff" stroke-width="2"/>
+<line x1="378.71" y1="99.50" x2="368.71" y2="109.50" stroke="#ffffff" stroke-width="2"/>
+<rect x="375.74" y="92" width="13.58" height="25" rx="4" fill="#1b9e77" opacity="0.95" stroke="#e7298a" stroke-width="2"><title>Pred interval 10: silent; GT=interrupt; Pred=silent; PPL=1.216</title></rect>
+<line x1="377.53" y1="99.50" x2="387.53" y2="109.50" stroke="#ffffff" stroke-width="2"/>
+<line x1="387.53" y1="99.50" x2="377.53" y2="109.50" stroke="#ffffff" stroke-width="2"/>
+<rect x="449.07" y="92" width="13.58" height="25" rx="4" fill="#d95f02" opacity="0.95" stroke="#ffffff" stroke-width="1"><title>Pred interval 11: interrupt; GT=interrupt; Pred=interrupt; PPL=1.168</title></rect>
+<rect x="616.43" y="92" width="13.58" height="25" rx="4" fill="#1b9e77" opacity="0.95" stroke="#e7298a" stroke-width="2"><title>Pred interval 12: silent; GT=interrupt; Pred=silent; PPL=1.149</title></rect>
+<line x1="618.22" y1="99.50" x2="628.22" y2="109.50" stroke="#ffffff" stroke-width="2"/>
+<line x1="628.22" y1="99.50" x2="618.22" y2="109.50" stroke="#ffffff" stroke-width="2"/>
+<rect x="630.01" y="92" width="13.58" height="25" rx="4" fill="#d95f02" opacity="0.95" stroke="#e7298a" stroke-width="2"><title>Pred interval 13: interrupt; GT=silent; Pred=interrupt; PPL=1.188</title></rect>
+<line x1="631.80" y1="99.50" x2="641.80" y2="109.50" stroke="#ffffff" stroke-width="2"/>
+<line x1="641.80" y1="99.50" x2="631.80" y2="109.50" stroke="#ffffff" stroke-width="2"/>
+<rect x="863.07" y="92" width="13.58" height="25" rx="4" fill="#d95f02" opacity="0.95" stroke="#ffffff" stroke-width="1"><title>Pred interval 14: interrupt; GT=interrupt; Pred=interrupt; PPL=1.312</title></rect>
+<rect x="985.28" y="92" width="3.56" height="25" rx="4" fill="#d95f02" opacity="0.95" stroke="#e7298a" stroke-width="2"><title>Pred interval 15: interrupt; GT=silent; Pred=interrupt; PPL=1.228</title></rect>
+<line x1="982.06" y1="99.50" x2="992.06" y2="109.50" stroke="#ffffff" stroke-width="2"/>
+<line x1="992.06" y1="99.50" x2="982.06" y2="109.50" stroke="#ffffff" stroke-width="2"/>
+<rect x="988.84" y="92" width="13.58" height="25" rx="4" fill="#1b9e77" opacity="0.95" stroke="#e7298a" stroke-width="2"><title>Pred interval 16: silent; GT=interrupt; Pred=silent; PPL=1.343</title></rect>
+<line x1="990.63" y1="99.50" x2="1000.63" y2="109.50" stroke="#ffffff" stroke-width="2"/>
+<line x1="1000.63" y1="99.50" x2="990.63" y2="109.50" stroke="#ffffff" stroke-width="2"/>
+<rect x="1002.42" y="92" width="13.58" height="25" rx="4" fill="#d95f02" opacity="0.95" stroke="#e7298a" stroke-width="2"><title>Pred interval 17: interrupt; GT=silent; Pred=interrupt; PPL=1.185</title></rect>
+<line x1="1004.21" y1="99.50" x2="1014.21" y2="109.50" stroke="#ffffff" stroke-width="2"/>
+<line x1="1014.21" y1="99.50" x2="1004.21" y2="109.50" stroke="#ffffff" stroke-width="2"/>
+</svg>
+                <div class="table-wrap">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>#</th><th>Interval</th><th>Frames</th><th>Times</th><th>Sample preds</th><th>Votes</th>
+                        <th>GT</th><th>Pred</th><th>Correct</th><th>PPL</th><th>Gate</th>
+                        <th>GT answer</th><th>Generated text</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr class="ok"><td>0</td><td>0.0-2.0s</td><td>4, 11, 19, 26</td><td>0.27, 0.73, 1.27, 1.73</td><td>interrupt, interrupt, silent, silent</td><td>2 int / 2 sil</td><td><span class="pill interrupt">interrupt</span></td><td><span class="pill interrupt">interrupt</span></td><td>yes</td><td>1.609</td><td>1.672</td><td>Added 2 tablespoons of chia seeds instead of 1 tablespoon.</td><td>The ingredients for the strawberry and chia yogurt bowl are placed on a white marble countertop. | Then, the ingredients are put into a bowl.</td></tr>
+<tr class="bad"><td>1</td><td>2.0-10.0s</td><td>45, 75, 105, 135</td><td>3.00, 5.00, 7.00, 9.00</td><td>interrupt, interrupt, silent, interrupt</td><td>3 int / 1 sil</td><td><span class="pill silent">silent</span></td><td><span class="pill interrupt">interrupt</span></td><td>no</td><td>1.469</td><td>1.415</td><td></td><td>Next, a hand pours the yogurt into the bowl. | Then, the hand pours the chia seed powder into the bowl. | Then, the hand pours the strawberries into the bowl.</td></tr>
+<tr class="bad"><td>2</td><td>10.0-18.0s</td><td>165, 195, 225, 255</td><td>11.00, 13.00, 15.00, 17.00</td><td>interrupt, silent, silent, silent</td><td>1 int / 3 sil</td><td><span class="pill silent">silent</span></td><td><span class="pill interrupt">interrupt</span></td><td>no</td><td>1.229</td><td>1.385</td><td></td><td>Then, the hand pours the chia seed powder into the bowl.</td></tr>
+<tr class="ok"><td>3</td><td>18.0-25.6s</td><td>284, 313, 341, 370</td><td>18.93, 20.87, 22.73, 24.67</td><td>silent, silent, silent, silent</td><td>0 int / 4 sil</td><td><span class="pill silent">silent</span></td><td><span class="pill silent">silent</span></td><td>yes</td><td>1.175</td><td>1.385</td><td></td><td></td></tr>
+<tr class="bad"><td>4</td><td>25.6-33.6s</td><td>399, 429, 459, 489</td><td>26.60, 28.60, 30.60, 32.60</td><td>silent, silent, silent, silent</td><td>0 int / 4 sil</td><td><span class="pill interrupt">interrupt</span></td><td><span class="pill silent">silent</span></td><td>no</td><td>1.324</td><td>1.385</td><td>Oops — skip the extra tablespoon of chia seeds! Remove 1 tablespoon to fix the amount.</td><td></td></tr>
+<tr class="bad"><td>5</td><td>33.6-38.1s</td><td>512, 529, 546, 563</td><td>34.13, 35.27, 36.40, 37.53</td><td>silent, silent, silent, silent</td><td>0 int / 4 sil</td><td><span class="pill interrupt">interrupt</span></td><td><span class="pill silent">silent</span></td><td>no</td><td>1.356</td><td>1.385</td><td>Scoop 1 cup of plain yogurt into a glass, then wipe the glass clean—ready for the next step!</td><td></td></tr>
+<tr class="bad"><td>6</td><td>118.1-120.3s</td><td>1776, 1784, 1792, 1800</td><td>118.40, 118.93, 119.47, 120.00</td><td>interrupt, silent, silent, silent</td><td>1 int / 3 sil</td><td><span class="pill silent">silent</span></td><td><span class="pill interrupt">interrupt</span></td><td>no</td><td>1.490</td><td>1.747</td><td></td><td>Then, the hand pours the strawberries into the bowl.</td></tr>
+<tr class="ok"><td>7</td><td>120.3-128.3s</td><td>1820, 1850, 1880, 1910</td><td>121.33, 123.33, 125.33, 127.33</td><td>interrupt, silent, silent, silent</td><td>1 int / 3 sil</td><td><span class="pill interrupt">interrupt</span></td><td><span class="pill interrupt">interrupt</span></td><td>yes</td><td>1.275</td><td>1.482</td><td>Wash those 5–6 strawberries under running water, let them drain in the colander, then pop them back in the bowl.</td><td>Then, the hand pours the yogurt into the bowl.</td></tr>
+<tr class="bad"><td>8</td><td>128.3-136.3s</td><td>1940, 1970, 2000, 2030</td><td>129.33, 131.33, 133.33, 135.33</td><td>silent, interrupt, interrupt, interrupt</td><td>3 int / 1 sil</td><td><span class="pill silent">silent</span></td><td><span class="pill interrupt">interrupt</span></td><td>no</td><td>1.509</td><td>1.297</td><td></td><td>Finally, the hand picks up a strawberry and shows it to the camera. | Then, the hand puts the strawberries into a white plate and shows it to the camera. | Then, the hand puts t...</td></tr>
+<tr class="bad"><td>9</td><td>168.3-170.7s</td><td>2529, 2538, 2547, 2556</td><td>168.60, 169.20, 169.80, 170.40</td><td>interrupt, silent, silent, interrupt</td><td>2 int / 2 sil</td><td><span class="pill silent">silent</span></td><td><span class="pill interrupt">interrupt</span></td><td>no</td><td>1.265</td><td>1.258</td><td></td><td>Then, the hand puts the strawberries into a white plate and shows it to the camera. | Then, the hand puts the plate of strawberries under a faucet and rinses them.</td></tr>
+<tr class="bad"><td>10</td><td>170.7-178.7s</td><td>2576, 2606, 2636, 2666</td><td>171.73, 173.73, 175.73, 177.73</td><td>silent, silent, silent, silent</td><td>0 int / 4 sil</td><td><span class="pill interrupt">interrupt</span></td><td><span class="pill silent">silent</span></td><td>no</td><td>1.216</td><td>1.256</td><td>Go ahead and cut the strawberries — no need to remove the green stems first.</td><td></td></tr>
+<tr class="ok"><td>11</td><td>213.9-221.9s</td><td>3224, 3254, 3284, 3314</td><td>214.93, 216.93, 218.93, 220.93</td><td>interrupt, silent, silent, silent</td><td>1 int / 3 sil</td><td><span class="pill interrupt">interrupt</span></td><td><span class="pill interrupt">interrupt</span></td><td>yes</td><td>1.168</td><td>1.203</td><td>Oops — don’t cut the strawberries with stems still on! Remove the stems, discard them, slice the strawberries small, and add them to the bowl with chia seeds.</td><td>Then, the hand cuts the strawberries into pieces on a cutting board.</td></tr>
+<tr class="bad"><td>12</td><td>312.5-320.5s</td><td>4702, 4732, 4762, 4792</td><td>313.47, 315.47, 317.47, 319.47</td><td>silent, silent, silent, silent</td><td>0 int / 4 sil</td><td><span class="pill interrupt">interrupt</span></td><td><span class="pill silent">silent</span></td><td>no</td><td>1.149</td><td>1.203</td><td>Time to add the strawberries and yogurt to the bowl with chia seeds—give it a gentle stir to mix everything up!</td><td></td></tr>
+<tr class="bad"><td>13</td><td>320.5-328.5s</td><td>4822, 4852, 4882, 4912</td><td>321.47, 323.47, 325.47, 327.47</td><td>interrupt, interrupt, interrupt, interrupt</td><td>4 int / 0 sil</td><td><span class="pill silent">silent</span></td><td><span class="pill interrupt">interrupt</span></td><td>no</td><td>1.188</td><td>1.186</td><td></td><td>Then, the hand puts the strawberry pieces into a small bowl. | Then, the hand puts the strawberry pieces into a small bowl. | Finally, the hand holds the bowl of strawberry piec...</td></tr>
+<tr class="ok"><td>14</td><td>457.8-465.8s</td><td>6882, 6912, 6942, 6972</td><td>458.80, 460.80, 462.80, 464.80</td><td>interrupt, interrupt, silent, silent</td><td>2 int / 2 sil</td><td><span class="pill interrupt">interrupt</span></td><td><span class="pill interrupt">interrupt</span></td><td>yes</td><td>1.312</td><td>1.419</td><td>Oops! Looks like there’s a hiccup—let’s fix that step before moving on.</td><td>Then, the hand holds a bowl of yogurt and shows it to the camera. | Then, the hand puts the yogurt bowl on the table.</td></tr>
+<tr class="bad"><td>15</td><td>529.8-531.9s</td><td>7951, 7959, 7967, 7975</td><td>530.07, 530.60, 531.13, 531.67</td><td>interrupt, interrupt, silent, interrupt</td><td>3 int / 1 sil</td><td><span class="pill silent">silent</span></td><td><span class="pill interrupt">interrupt</span></td><td>no</td><td>1.228</td><td>1.200</td><td></td><td>Then, the hand picks up a mobile phone and shows it to the camera. | Then, the hand puts down the phone and picks up a spoon to eat the yogurt. | Finally, the hand puts down the...</td></tr>
+<tr class="bad"><td>16</td><td>531.9-539.9s</td><td>7994, 8024, 8054, 8084</td><td>532.93, 534.93, 536.93, 538.93</td><td>silent, silent, silent, silent</td><td>0 int / 4 sil</td><td><span class="pill interrupt">interrupt</span></td><td><span class="pill silent">silent</span></td><td>no</td><td>1.343</td><td>1.375</td><td>Time to move your mix into a clean bowl—ready to dig in!</td><td></td></tr>
+<tr class="bad"><td>17</td><td>539.9-547.9s</td><td>8114, 8144, 8174, 8204</td><td>540.93, 542.93, 544.93, 546.93</td><td>silent, interrupt, interrupt, silent</td><td>2 int / 2 sil</td><td><span class="pill silent">silent</span></td><td><span class="pill interrupt">interrupt</span></td><td>no</td><td>1.185</td><td>1.205</td><td></td><td>Then, the hand holds a bowl of yogurt and shows it to the camera. | Then, the hand holds a bowl of yogurt and shows it to the camera.</td></tr>
+                    </tbody>
+                  </table>
+                </div>
+              </details>
+            </section>
+            
+            <section class="video-section" id="video-9">
+              <details open>
+                <summary>
+                  <span>9. e8642b70adfbb6c0.mp4</span>
+                  <span class="summary-meta">macro-F1 28.6% | acc 40.0% (4/10) | Arts and Crafts</span>
+                </summary>
+                <div class="video-meta">
+                  <div><strong>Task:</strong> Decorating a candle with pressed flowers (using glue)</div>
+                  <div><strong>Query:</strong> How do I decorate a candle with pressed flowers using glue?</div>
+                  <div><strong>Video:</strong> <a href="videos/e8642b70adfbb6c0.mp4">videos/e8642b70adfbb6c0.mp4</a></div>
+                  <div><code>/data1/wearable_ai_challenge_data/egoproactive/val/e8642b70adfbb6c0.mp4</code></div>
+                </div>
+                <video class="video-player" controls preload="metadata" src="videos/e8642b70adfbb6c0.mp4"></video>
+                <svg viewBox="0 0 1040 156" class="timeline" role="img" aria-label="Timeline for e8642b70adfbb6c0.mp4">
+<text x="86" y="24" class="svg-axis">e8642b70adfbb6c0.mp4</text>
+<text x="18" y="65" class="svg-axis">GT</text>
+<text x="18" y="109" class="svg-axis">Pred</text>
+<line x1="86.0" y1="36" x2="86.0" y2="124" stroke="#d8dee9"/>
+<text x="86.0" y="146" text-anchor="middle" class="svg-muted">0s</text>
+<line x1="272.0" y1="36" x2="272.0" y2="124" stroke="#d8dee9"/>
+<text x="272.0" y="146" text-anchor="middle" class="svg-muted">41s</text>
+<line x1="458.0" y1="36" x2="458.0" y2="124" stroke="#d8dee9"/>
+<text x="458.0" y="146" text-anchor="middle" class="svg-muted">81s</text>
+<line x1="644.0000000000001" y1="36" x2="644.0000000000001" y2="124" stroke="#d8dee9"/>
+<text x="644.0000000000001" y="146" text-anchor="middle" class="svg-muted">122s</text>
+<line x1="830.0" y1="36" x2="830.0" y2="124" stroke="#d8dee9"/>
+<text x="830.0" y="146" text-anchor="middle" class="svg-muted">162s</text>
+<line x1="1016.0" y1="36" x2="1016.0" y2="124" stroke="#d8dee9"/>
+<text x="1016.0" y="146" text-anchor="middle" class="svg-muted">203s</text>
+<rect x="86.00" y="48" width="9.17" height="25" rx="4" fill="#d95f02" opacity="0.72" stroke="#ffffff" stroke-width="1"><title>GT interval 0: interrupt; GT=interrupt; Pred=interrupt; PPL=1.315</title></rect>
+<rect x="116.72" y="48" width="36.69" height="25" rx="4" fill="#d95f02" opacity="0.72" stroke="#ffffff" stroke-width="1"><title>GT interval 1: interrupt; GT=interrupt; Pred=interrupt; PPL=1.778</title></rect>
+<rect x="263.47" y="48" width="36.69" height="25" rx="4" fill="#1b9e77" opacity="0.72" stroke="#ffffff" stroke-width="1"><title>GT interval 2: silent; GT=silent; Pred=interrupt; PPL=1.256</title></rect>
+<rect x="354.73" y="48" width="36.69" height="25" rx="4" fill="#d95f02" opacity="0.72" stroke="#ffffff" stroke-width="1"><title>GT interval 3: interrupt; GT=interrupt; Pred=silent; PPL=1.217</title></rect>
+<rect x="391.41" y="48" width="36.69" height="25" rx="4" fill="#1b9e77" opacity="0.72" stroke="#ffffff" stroke-width="1"><title>GT interval 4: silent; GT=silent; Pred=interrupt; PPL=1.148</title></rect>
+<rect x="721.59" y="48" width="36.69" height="25" rx="4" fill="#1b9e77" opacity="0.72" stroke="#ffffff" stroke-width="1"><title>GT interval 5: silent; GT=silent; Pred=interrupt; PPL=1.508</title></rect>
+<rect x="761.95" y="48" width="36.69" height="25" rx="4" fill="#d95f02" opacity="0.72" stroke="#ffffff" stroke-width="1"><title>GT interval 6: interrupt; GT=interrupt; Pred=interrupt; PPL=1.205</title></rect>
+<rect x="908.69" y="48" width="33.93" height="25" rx="4" fill="#1b9e77" opacity="0.72" stroke="#ffffff" stroke-width="1"><title>GT interval 7: silent; GT=silent; Pred=interrupt; PPL=1.338</title></rect>
+<rect x="942.63" y="48" width="36.69" height="25" rx="4" fill="#d95f02" opacity="0.72" stroke="#ffffff" stroke-width="1"><title>GT interval 8: interrupt; GT=interrupt; Pred=interrupt; PPL=1.362</title></rect>
+<rect x="979.31" y="48" width="36.69" height="25" rx="4" fill="#1b9e77" opacity="0.72" stroke="#ffffff" stroke-width="1"><title>GT interval 9: silent; GT=silent; Pred=interrupt; PPL=1.392</title></rect>
+<rect x="86.00" y="92" width="9.17" height="25" rx="4" fill="#d95f02" opacity="0.95" stroke="#ffffff" stroke-width="1"><title>Pred interval 0: interrupt; GT=interrupt; Pred=interrupt; PPL=1.315</title></rect>
+<rect x="116.72" y="92" width="36.69" height="25" rx="4" fill="#d95f02" opacity="0.95" stroke="#ffffff" stroke-width="1"><title>Pred interval 1: interrupt; GT=interrupt; Pred=interrupt; PPL=1.778</title></rect>
+<rect x="263.47" y="92" width="36.69" height="25" rx="4" fill="#d95f02" opacity="0.95" stroke="#e7298a" stroke-width="2"><title>Pred interval 2: interrupt; GT=silent; Pred=interrupt; PPL=1.256</title></rect>
+<line x1="276.81" y1="99.50" x2="286.81" y2="109.50" stroke="#ffffff" stroke-width="2"/>
+<line x1="286.81" y1="99.50" x2="276.81" y2="109.50" stroke="#ffffff" stroke-width="2"/>
+<rect x="354.73" y="92" width="36.69" height="25" rx="4" fill="#1b9e77" opacity="0.95" stroke="#e7298a" stroke-width="2"><title>Pred interval 3: silent; GT=interrupt; Pred=silent; PPL=1.217</title></rect>
+<line x1="368.07" y1="99.50" x2="378.07" y2="109.50" stroke="#ffffff" stroke-width="2"/>
+<line x1="378.07" y1="99.50" x2="368.07" y2="109.50" stroke="#ffffff" stroke-width="2"/>
+<rect x="391.41" y="92" width="36.69" height="25" rx="4" fill="#d95f02" opacity="0.95" stroke="#e7298a" stroke-width="2"><title>Pred interval 4: interrupt; GT=silent; Pred=interrupt; PPL=1.148</title></rect>
+<line x1="404.76" y1="99.50" x2="414.76" y2="109.50" stroke="#ffffff" stroke-width="2"/>
+<line x1="414.76" y1="99.50" x2="404.76" y2="109.50" stroke="#ffffff" stroke-width="2"/>
+<rect x="721.59" y="92" width="36.69" height="25" rx="4" fill="#d95f02" opacity="0.95" stroke="#e7298a" stroke-width="2"><title>Pred interval 5: interrupt; GT=silent; Pred=interrupt; PPL=1.508</title></rect>
+<line x1="734.93" y1="99.50" x2="744.93" y2="109.50" stroke="#ffffff" stroke-width="2"/>
+<line x1="744.93" y1="99.50" x2="734.93" y2="109.50" stroke="#ffffff" stroke-width="2"/>
+<rect x="761.95" y="92" width="36.69" height="25" rx="4" fill="#d95f02" opacity="0.95" stroke="#ffffff" stroke-width="1"><title>Pred interval 6: interrupt; GT=interrupt; Pred=interrupt; PPL=1.205</title></rect>
+<rect x="908.69" y="92" width="33.93" height="25" rx="4" fill="#d95f02" opacity="0.95" stroke="#e7298a" stroke-width="2"><title>Pred interval 7: interrupt; GT=silent; Pred=interrupt; PPL=1.338</title></rect>
+<line x1="920.66" y1="99.50" x2="930.66" y2="109.50" stroke="#ffffff" stroke-width="2"/>
+<line x1="930.66" y1="99.50" x2="920.66" y2="109.50" stroke="#ffffff" stroke-width="2"/>
+<rect x="942.63" y="92" width="36.69" height="25" rx="4" fill="#d95f02" opacity="0.95" stroke="#ffffff" stroke-width="1"><title>Pred interval 8: interrupt; GT=interrupt; Pred=interrupt; PPL=1.362</title></rect>
+<rect x="979.31" y="92" width="36.69" height="25" rx="4" fill="#d95f02" opacity="0.95" stroke="#e7298a" stroke-width="2"><title>Pred interval 9: interrupt; GT=silent; Pred=interrupt; PPL=1.392</title></rect>
+<line x1="992.66" y1="99.50" x2="1002.66" y2="109.50" stroke="#ffffff" stroke-width="2"/>
+<line x1="1002.66" y1="99.50" x2="992.66" y2="109.50" stroke="#ffffff" stroke-width="2"/>
+</svg>
+                <div class="table-wrap">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>#</th><th>Interval</th><th>Frames</th><th>Times</th><th>Sample preds</th><th>Votes</th>
+                        <th>GT</th><th>Pred</th><th>Correct</th><th>PPL</th><th>Gate</th>
+                        <th>GT answer</th><th>Generated text</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr class="ok"><td>0</td><td>0.0-2.0s</td><td>4, 11, 19, 26</td><td>0.27, 0.73, 1.27, 1.73</td><td>interrupt, interrupt, interrupt, silent</td><td>3 int / 1 sil</td><td><span class="pill interrupt">interrupt</span></td><td><span class="pill interrupt">interrupt</span></td><td>yes</td><td>1.315</td><td>1.338</td><td>Got your pressed flowers, white candle, and glue bottle? Let’s start decorating!</td><td>The video begins with a table in the kitchen. On the table, there is a white candle, a roll of tape, and some other items. The background shows a refrigerator covered with vario...</td></tr>
+<tr class="ok"><td>1</td><td>6.7-14.7s</td><td>116, 146, 176, 206</td><td>7.73, 9.73, 11.73, 13.73</td><td>interrupt, interrupt, interrupt, interrupt</td><td>4 int / 0 sil</td><td><span class="pill interrupt">interrupt</span></td><td><span class="pill interrupt">interrupt</span></td><td>yes</td><td>1.778</td><td>1.708</td><td>Time to glue! Spread a thin layer of glue on the candle, then gently press your first flowers onto it.</td><td>Then, the hand picks up a white tube and uses it to draw a line on the table. | The hand then picks up a cup of water and pours it onto the table. | The hand then picks up a whi...</td></tr>
+<tr class="bad"><td>2</td><td>38.7-46.7s</td><td>596, 626, 656, 686</td><td>39.73, 41.73, 43.73, 45.73</td><td>interrupt, interrupt, silent, silent</td><td>2 int / 2 sil</td><td><span class="pill silent">silent</span></td><td><span class="pill interrupt">interrupt</span></td><td>no</td><td>1.256</td><td>1.327</td><td></td><td>The hand then picks up the white tube and applies glue to it. | The hand then applies glue to the white tube and sticks the pressed flowers onto it.</td></tr>
+<tr class="bad"><td>3</td><td>58.6-66.6s</td><td>894, 924, 954, 984</td><td>59.60, 61.60, 63.60, 65.60</td><td>silent, silent, silent, silent</td><td>0 int / 4 sil</td><td><span class="pill interrupt">interrupt</span></td><td><span class="pill silent">silent</span></td><td>no</td><td>1.217</td><td>1.327</td><td>Need more flowers? Just dab on a bit more glue, spin the candle, and stick ‘em on—keep going till every side’s covered!</td><td></td></tr>
+<tr class="bad"><td>4</td><td>66.6-74.6s</td><td>1014, 1044, 1074, 1104</td><td>67.60, 69.60, 71.60, 73.60</td><td>silent, interrupt, silent, silent</td><td>1 int / 3 sil</td><td><span class="pill silent">silent</span></td><td><span class="pill interrupt">interrupt</span></td><td>no</td><td>1.148</td><td>1.205</td><td></td><td>The hand then applies glue to the white tube and sticks the pressed flowers onto it.</td></tr>
+<tr class="bad"><td>5</td><td>138.6-146.6s</td><td>2094, 2124, 2154, 2184</td><td>139.60, 141.60, 143.60, 145.60</td><td>silent, silent, interrupt, interrupt</td><td>2 int / 2 sil</td><td><span class="pill silent">silent</span></td><td><span class="pill interrupt">interrupt</span></td><td>no</td><td>1.508</td><td>1.353</td><td></td><td>Finally, the hand holds up the finished candle. | The hand then rotates the candle, showing it from all angles.</td></tr>
+<tr class="ok"><td>6</td><td>147.4-155.4s</td><td>2226, 2256, 2286, 2316</td><td>148.40, 150.40, 152.40, 154.40</td><td>interrupt, interrupt, interrupt, silent</td><td>3 int / 1 sil</td><td><span class="pill interrupt">interrupt</span></td><td><span class="pill interrupt">interrupt</span></td><td>yes</td><td>1.205</td><td>1.254</td><td>Gently warm the glued flowers with your hairdryer to speed up drying—hold the candle steady while you do!</td><td>The hand then places the candle on the table. | The hand then picks up the white tube and squeezes out some glue. | The hand then applies glue to the white tube and sticks the p...</td></tr>
+<tr class="bad"><td>7</td><td>179.4-186.8s</td><td>2705, 2733, 2760, 2788</td><td>180.33, 182.20, 184.00, 185.87</td><td>interrupt, silent, interrupt, interrupt</td><td>3 int / 1 sil</td><td><span class="pill silent">silent</span></td><td><span class="pill interrupt">interrupt</span></td><td>no</td><td>1.338</td><td>1.330</td><td></td><td>The hand then uses a hairdryer to dry the glue on the white tube. | The hand then rotates the candle, showing it from all angles. | The hand then places the candle on the table.</td></tr>
+<tr class="ok"><td>8</td><td>186.8-194.8s</td><td>2817, 2847, 2877, 2907</td><td>187.80, 189.80, 191.80, 193.80</td><td>interrupt, silent, silent, silent</td><td>1 int / 3 sil</td><td><span class="pill interrupt">interrupt</span></td><td><span class="pill interrupt">interrupt</span></td><td>yes</td><td>1.362</td><td>1.373</td><td>Take a quick look at your candle—make sure everything’s perfect, then show it off and fix any tiny tweaks if needed!</td><td>The hand then uses a hairdryer to dry the glue on the white tube.</td></tr>
+<tr class="bad"><td>9</td><td>194.8-202.8s</td><td>2937, 2967, 2997, 3027</td><td>195.80, 197.80, 199.80, 201.80</td><td>silent, interrupt, silent, silent</td><td>1 int / 3 sil</td><td><span class="pill silent">silent</span></td><td><span class="pill interrupt">interrupt</span></td><td>no</td><td>1.392</td><td>1.481</td><td></td><td>The hand then rotates the candle, showing it from all angles.</td></tr>
+                    </tbody>
+                  </table>
+                </div>
+              </details>
+            </section>
+            
+            <section class="video-section" id="video-10">
+              <details open>
+                <summary>
+                  <span>10. cc4ac34272e4c3e4.mp4</span>
+                  <span class="summary-meta">macro-F1 28.6% | acc 28.6% (2/7) | Tutorial</span>
+                </summary>
+                <div class="video-meta">
+                  <div><strong>Task:</strong> How to update your phone apps</div>
+                  <div><strong>Query:</strong> How do I update my phone apps?</div>
+                  <div><strong>Video:</strong> <a href="videos/cc4ac34272e4c3e4.mp4">videos/cc4ac34272e4c3e4.mp4</a></div>
+                  <div><code>/data1/wearable_ai_challenge_data/egoproactive/val/cc4ac34272e4c3e4.mp4</code></div>
+                </div>
+                <video class="video-player" controls preload="metadata" src="videos/cc4ac34272e4c3e4.mp4"></video>
+                <svg viewBox="0 0 1040 156" class="timeline" role="img" aria-label="Timeline for cc4ac34272e4c3e4.mp4">
+<text x="86" y="24" class="svg-axis">cc4ac34272e4c3e4.mp4</text>
+<text x="18" y="65" class="svg-axis">GT</text>
+<text x="18" y="109" class="svg-axis">Pred</text>
+<line x1="86.0" y1="36" x2="86.0" y2="124" stroke="#d8dee9"/>
+<text x="86.0" y="146" text-anchor="middle" class="svg-muted">0s</text>
+<line x1="272.0" y1="36" x2="272.0" y2="124" stroke="#d8dee9"/>
+<text x="272.0" y="146" text-anchor="middle" class="svg-muted">6s</text>
+<line x1="458.0" y1="36" x2="458.0" y2="124" stroke="#d8dee9"/>
+<text x="458.0" y="146" text-anchor="middle" class="svg-muted">12s</text>
+<line x1="644.0" y1="36" x2="644.0" y2="124" stroke="#d8dee9"/>
+<text x="644.0" y="146" text-anchor="middle" class="svg-muted">17s</text>
+<line x1="830.0" y1="36" x2="830.0" y2="124" stroke="#d8dee9"/>
+<text x="830.0" y="146" text-anchor="middle" class="svg-muted">23s</text>
+<line x1="1016.0" y1="36" x2="1016.0" y2="124" stroke="#d8dee9"/>
+<text x="1016.0" y="146" text-anchor="middle" class="svg-muted">29s</text>
+<rect x="86.00" y="48" width="63.92" height="25" rx="4" fill="#d95f02" opacity="0.72" stroke="#ffffff" stroke-width="1"><title>GT interval 0: interrupt; GT=interrupt; Pred=interrupt; PPL=1.703</title></rect>
+<rect x="149.92" y="48" width="89.48" height="25" rx="4" fill="#d95f02" opacity="0.72" stroke="#ffffff" stroke-width="1"><title>GT interval 1: interrupt; GT=interrupt; Pred=silent; PPL=1.189</title></rect>
+<rect x="239.40" y="48" width="67.11" height="25" rx="4" fill="#d95f02" opacity="0.72" stroke="#ffffff" stroke-width="1"><title>GT interval 2: interrupt; GT=interrupt; Pred=silent; PPL=1.181</title></rect>
+<rect x="306.52" y="48" width="86.29" height="25" rx="4" fill="#1b9e77" opacity="0.72" stroke="#ffffff" stroke-width="1"><title>GT interval 3: silent; GT=silent; Pred=silent; PPL=1.145</title></rect>
+<rect x="392.80" y="48" width="255.67" height="25" rx="4" fill="#d95f02" opacity="0.72" stroke="#ffffff" stroke-width="1"><title>GT interval 4: interrupt; GT=interrupt; Pred=silent; PPL=1.161</title></rect>
+<rect x="648.47" y="48" width="111.86" height="25" rx="4" fill="#d95f02" opacity="0.72" stroke="#ffffff" stroke-width="1"><title>GT interval 5: interrupt; GT=interrupt; Pred=silent; PPL=1.174</title></rect>
+<rect x="760.33" y="48" width="255.67" height="25" rx="4" fill="#1b9e77" opacity="0.72" stroke="#ffffff" stroke-width="1"><title>GT interval 6: silent; GT=silent; Pred=interrupt; PPL=1.102</title></rect>
+<rect x="86.00" y="92" width="63.92" height="25" rx="4" fill="#d95f02" opacity="0.95" stroke="#ffffff" stroke-width="1"><title>Pred interval 0: interrupt; GT=interrupt; Pred=interrupt; PPL=1.703</title></rect>
+<rect x="149.92" y="92" width="89.48" height="25" rx="4" fill="#1b9e77" opacity="0.95" stroke="#e7298a" stroke-width="2"><title>Pred interval 1: silent; GT=interrupt; Pred=silent; PPL=1.189</title></rect>
+<line x1="189.66" y1="99.50" x2="199.66" y2="109.50" stroke="#ffffff" stroke-width="2"/>
+<line x1="199.66" y1="99.50" x2="189.66" y2="109.50" stroke="#ffffff" stroke-width="2"/>
+<rect x="239.40" y="92" width="67.11" height="25" rx="4" fill="#1b9e77" opacity="0.95" stroke="#e7298a" stroke-width="2"><title>Pred interval 2: silent; GT=interrupt; Pred=silent; PPL=1.181</title></rect>
+<line x1="267.96" y1="99.50" x2="277.96" y2="109.50" stroke="#ffffff" stroke-width="2"/>
+<line x1="277.96" y1="99.50" x2="267.96" y2="109.50" stroke="#ffffff" stroke-width="2"/>
+<rect x="306.52" y="92" width="86.29" height="25" rx="4" fill="#1b9e77" opacity="0.95" stroke="#ffffff" stroke-width="1"><title>Pred interval 3: silent; GT=silent; Pred=silent; PPL=1.145</title></rect>
+<rect x="392.80" y="92" width="255.67" height="25" rx="4" fill="#1b9e77" opacity="0.95" stroke="#e7298a" stroke-width="2"><title>Pred interval 4: silent; GT=interrupt; Pred=silent; PPL=1.161</title></rect>
+<line x1="515.64" y1="99.50" x2="525.64" y2="109.50" stroke="#ffffff" stroke-width="2"/>
+<line x1="525.64" y1="99.50" x2="515.64" y2="109.50" stroke="#ffffff" stroke-width="2"/>
+<rect x="648.47" y="92" width="111.86" height="25" rx="4" fill="#1b9e77" opacity="0.95" stroke="#e7298a" stroke-width="2"><title>Pred interval 5: silent; GT=interrupt; Pred=silent; PPL=1.174</title></rect>
+<line x1="699.40" y1="99.50" x2="709.40" y2="109.50" stroke="#ffffff" stroke-width="2"/>
+<line x1="709.40" y1="99.50" x2="699.40" y2="109.50" stroke="#ffffff" stroke-width="2"/>
+<rect x="760.33" y="92" width="255.67" height="25" rx="4" fill="#d95f02" opacity="0.95" stroke="#e7298a" stroke-width="2"><title>Pred interval 6: interrupt; GT=silent; Pred=interrupt; PPL=1.102</title></rect>
+<line x1="883.16" y1="99.50" x2="893.16" y2="109.50" stroke="#ffffff" stroke-width="2"/>
+<line x1="893.16" y1="99.50" x2="883.16" y2="109.50" stroke="#ffffff" stroke-width="2"/>
+</svg>
+                <div class="table-wrap">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>#</th><th>Interval</th><th>Frames</th><th>Times</th><th>Sample preds</th><th>Votes</th>
+                        <th>GT</th><th>Pred</th><th>Correct</th><th>PPL</th><th>Gate</th>
+                        <th>GT answer</th><th>Generated text</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr class="ok"><td>0</td><td>0.0-2.0s</td><td>4, 11, 19, 26</td><td>0.27, 0.73, 1.27, 1.73</td><td>interrupt, interrupt, interrupt, interrupt</td><td>4 int / 0 sil</td><td><span class="pill interrupt">interrupt</span></td><td><span class="pill interrupt">interrupt</span></td><td>yes</td><td>1.703</td><td>1.629</td><td>Unlock your phone and tap the Play Store (or App Store) icon.</td><td>You can update your phone apps by going to the app store. | Then, the hands pick up the phone and open the app store. | The hands then tap the phone screen, and a list of apps a...</td></tr>
+<tr class="bad"><td>1</td><td>2.0-4.8s</td><td>35, 46, 56, 67</td><td>2.33, 3.07, 3.73, 4.47</td><td>silent, silent, silent, silent</td><td>0 int / 4 sil</td><td><span class="pill interrupt">interrupt</span></td><td><span class="pill silent">silent</span></td><td>no</td><td>1.189</td><td>1.241</td><td>Tap your profile or menu icon, then pick “Manage apps &amp; device” to check for updates.</td><td></td></tr>
+<tr class="bad"><td>2</td><td>4.8-6.9s</td><td>76, 84, 92, 100</td><td>5.07, 5.60, 6.13, 6.67</td><td>silent, silent, silent, silent</td><td>0 int / 4 sil</td><td><span class="pill interrupt">interrupt</span></td><td><span class="pill silent">silent</span></td><td>no</td><td>1.181</td><td>1.241</td><td>Tap “Update all” or individual update buttons to grab the latest app versions.</td><td></td></tr>
+<tr class="ok"><td>3</td><td>6.9-9.6s</td><td>109, 119, 129, 139</td><td>7.27, 7.93, 8.60, 9.27</td><td>silent, silent, silent, silent</td><td>0 int / 4 sil</td><td><span class="pill silent">silent</span></td><td><span class="pill silent">silent</span></td><td>yes</td><td>1.145</td><td>1.241</td><td></td><td></td></tr>
+<tr class="bad"><td>4</td><td>9.6-17.6s</td><td>159, 189, 219, 249</td><td>10.60, 12.60, 14.60, 16.60</td><td>silent, silent, silent, silent</td><td>0 int / 4 sil</td><td><span class="pill interrupt">interrupt</span></td><td><span class="pill silent">silent</span></td><td>no</td><td>1.161</td><td>1.241</td><td>Swipe through pending updates—tap any app (like AT&amp;T ActiveArmor) to peek at its details if you’d like!</td><td></td></tr>
+<tr class="bad"><td>5</td><td>17.6-21.1s</td><td>271, 284, 297, 310</td><td>18.07, 18.93, 19.80, 20.67</td><td>silent, silent, silent, silent</td><td>0 int / 4 sil</td><td><span class="pill interrupt">interrupt</span></td><td><span class="pill silent">silent</span></td><td>no</td><td>1.174</td><td>1.241</td><td>Hang tight—watch those progress bars shrink as each app installs and the update count drops!</td><td></td></tr>
+<tr class="bad"><td>6</td><td>21.1-29.1s</td><td>332, 362, 392, 422</td><td>22.13, 24.13, 26.13, 28.13</td><td>interrupt, silent, silent, silent</td><td>1 int / 3 sil</td><td><span class="pill silent">silent</span></td><td><span class="pill interrupt">interrupt</span></td><td>no</td><td>1.102</td><td>1.200</td><td></td><td>The hands then tap the phone screen, and a list of apps appears. The hands then pick up the phone and open the app store.</td></tr>
+                    </tbody>
+                  </table>
+                </div>
+              </details>
+            </section>
+            
+</main>
+</body>
+</html>

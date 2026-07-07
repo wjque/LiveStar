@@ -1,0 +1,18 @@
+Launching shard 0 on GPU 4: 87 records, 4940 sampled frames
+Launching shard 1 on GPU 5: 87 records, 4940 sampled frames
+Launching shard 2 on GPU 6: 88 records, 4956 sampled frames
+Launching shard 3 on GPU 7: 88 records, 4956 sampled frames
+
+== Overall Metrics ==
+intervals: 4948
+accuracy : 0.5471
+confusion: {'gt_interrupt_pred_interrupt': 1282, 'gt_interrupt_pred_silent': 1373, 'gt_silent_pred_interrupt': 868, 'gt_silent_pred_silent': 1425}
+interrupt: precision=0.5963 recall=0.4829 f1=0.5336
+silent   : precision=0.5093 recall=0.6215 f1=0.5598
+
+Saved merged predictions to /home/quewenjun/workspace/proactive_vlm/LiveStar/evaluate/output/egoproactive_sved_sample350_fpi4_ctxi20_f80_hist20_majority1.jsonl
+Shard logs and outputs are in /home/quewenjun/workspace/proactive_vlm/LiveStar/evaluate/output/egoproactive_sved_sample350_fpi4_ctxi20_f80_hist20_majority1_shards
+Loaded 350 videos; evaluated 350, failed 0; 4948 intervals
+Accuracy: 54.7%
+HTML report: /home/quewenjun/workspace/proactive_vlm/LiveStar/evaluate/output/egoproactive_sved_sample350_fpi4_ctxi20_f80_hist20_majority1_viz/index.html
+Summary JSON: /home/quewenjun/workspace/proactive_vlm/LiveStar/evaluate/output/egoproactive_sved_sample350_fpi4_ctxi20_f80_hist20_majority1_viz/summary.json

@@ -1,0 +1,105 @@
+Special tokens have been added in the vocabulary, make sure the associated word embeddings are fine-tuned or trained.
+Model dir: /tmp/livestar_eval_model_hfnpbx1_
+Loading checkpoint shards:   0%|          | 0/4 [00:00<?, ?it/s]Loading checkpoint shards:  25%|██▌       | 1/4 [00:03<00:09,  3.07s/it]Loading checkpoint shards:  50%|█████     | 2/4 [00:04<00:04,  2.16s/it]Loading checkpoint shards:  75%|███████▌  | 3/4 [00:05<00:01,  1.77s/it]Loading checkpoint shards: 100%|██████████| 4/4 [00:06<00:00,  1.26s/it]Loading checkpoint shards: 100%|██████████| 4/4 [00:06<00:00,  1.59s/it]
+Evaluating egoproactive:   0%|          | 0/88 [00:00<?, ?it/s]/home/quewenjun/miniconda3/envs/LiveStar/lib/python3.9/site-packages/transformers/generation/configuration_utils.py:392: UserWarning: `do_sample` is set to `False`. However, `temperature` is set to `0.0` -- this flag is only used in sample-based generation modes. You should set `do_sample=True` or unset `temperature`.
+  warnings.warn(
+/home/quewenjun/miniconda3/envs/LiveStar/lib/python3.9/site-packages/transformers/generation/configuration_utils.py:397: UserWarning: `do_sample` is set to `False`. However, `top_p` is set to `0.1` -- this flag is only used in sample-based generation modes. You should set `do_sample=True` or unset `top_p`.
+  warnings.warn(
+Evaluating egoproactive:   1%|          | 1/88 [00:42<1:01:50, 42.65s/it]Evaluating egoproactive:   2%|▏         | 2/88 [01:28<1:03:37, 44.39s/it]Evaluating egoproactive:   3%|▎         | 3/88 [04:24<2:28:21, 104.73s/it]Evaluating egoproactive:   5%|▍         | 4/88 [06:30<2:38:15, 113.04s/it]Evaluating egoproactive:   6%|▌         | 5/88 [07:30<2:09:37, 93.71s/it] Evaluating egoproactive:   7%|▋         | 6/88 [09:30<2:20:21, 102.70s/it]Evaluating egoproactive:   8%|▊         | 7/88 [11:11<2:17:56, 102.18s/it]Evaluating egoproactive:   9%|▉         | 8/88 [13:35<2:34:12, 115.66s/it]Evaluating egoproactive:  10%|█         | 9/88 [15:18<2:26:54, 111.58s/it]Evaluating egoproactive:  11%|█▏        | 10/88 [16:07<2:00:00, 92.31s/it]Evaluating egoproactive:  12%|█▎        | 11/88 [17:53<2:03:48, 96.48s/it]Evaluating egoproactive:  14%|█▎        | 12/88 [18:51<1:47:33, 84.92s/it]Evaluating egoproactive:  15%|█▍        | 13/88 [19:17<1:23:38, 66.91s/it]Evaluating egoproactive:  16%|█▌        | 14/88 [20:01<1:14:09, 60.12s/it]Evaluating egoproactive:  17%|█▋        | 15/88 [21:08<1:15:32, 62.09s/it]Evaluating egoproactive:  18%|█▊        | 16/88 [22:47<1:27:45, 73.13s/it]Evaluating egoproactive:  19%|█▉        | 17/88 [23:44<1:20:55, 68.38s/it]Evaluating egoproactive:  20%|██        | 18/88 [24:39<1:15:05, 64.37s/it]Evaluating egoproactive:  22%|██▏       | 19/88 [27:55<1:59:21, 103.79s/it]Evaluating egoproactive:  23%|██▎       | 20/88 [29:09<1:47:44, 95.06s/it] Evaluating egoproactive:  24%|██▍       | 21/88 [32:14<2:16:15, 122.02s/it]Evaluating egoproactive:  25%|██▌       | 22/88 [33:22<1:56:25, 105.84s/it]Evaluating egoproactive:  26%|██▌       | 23/88 [35:10<1:55:12, 106.35s/it]Evaluating egoproactive:  27%|██▋       | 24/88 [37:17<2:00:04, 112.57s/it]Evaluating egoproactive:  28%|██▊       | 25/88 [38:20<1:42:25, 97.55s/it] Evaluating egoproactive:  30%|██▉       | 26/88 [39:44<1:36:50, 93.72s/it]Evaluating egoproactive:  31%|███       | 27/88 [42:23<1:55:13, 113.33s/it]Evaluating egoproactive:  32%|███▏      | 28/88 [43:24<1:37:26, 97.43s/it] Evaluating egoproactive:  33%|███▎      | 29/88 [45:48<1:49:40, 111.53s/it]Evaluating egoproactive:  34%|███▍      | 30/88 [47:13<1:40:09, 103.61s/it]Evaluating egoproactive:  35%|███▌      | 31/88 [50:20<2:02:08, 128.58s/it]Evaluating egoproactive:  36%|███▋      | 32/88 [51:27<1:42:34, 109.91s/it]Evaluating egoproactive:  38%|███▊      | 33/88 [52:14<1:23:31, 91.11s/it] Evaluating egoproactive:  39%|███▊      | 34/88 [53:12<1:13:09, 81.29s/it]Evaluating egoproactive:  40%|███▉      | 35/88 [55:03<1:19:43, 90.26s/it]Evaluating egoproactive:  41%|████      | 36/88 [56:15<1:13:29, 84.81s/it]Evaluating egoproactive:  42%|████▏     | 37/88 [57:02<1:02:14, 73.22s/it]Evaluating egoproactive:  43%|████▎     | 38/88 [58:19<1:01:58, 74.37s/it]Evaluating egoproactive:  44%|████▍     | 39/88 [59:18<57:01, 69.83s/it]  Evaluating egoproactive:  45%|████▌     | 40/88 [1:03:09<1:34:34, 118.23s/it]Evaluating egoproactive:  47%|████▋     | 41/88 [1:05:02<1:31:15, 116.50s/it]Evaluating egoproactive:  48%|████▊     | 42/88 [1:09:00<1:57:22, 153.09s/it]Evaluating egoproactive:  49%|████▉     | 43/88 [1:10:38<1:42:19, 136.44s/it]Evaluating egoproactive:  50%|█████     | 44/88 [1:12:03<1:28:51, 121.17s/it]Evaluating egoproactive:  51%|█████     | 45/88 [1:12:47<1:10:09, 97.89s/it] Evaluating egoproactive:  52%|█████▏    | 46/88 [1:14:57<1:15:25, 107.75s/it]Evaluating egoproactive:  53%|█████▎    | 47/88 [1:16:33<1:11:08, 104.12s/it]Evaluating egoproactive:  55%|█████▍    | 48/88 [1:18:14<1:08:46, 103.17s/it]Evaluating egoproactive:  56%|█████▌    | 49/88 [1:18:41<52:08, 80.22s/it]   Evaluating egoproactive:  57%|█████▋    | 50/88 [1:19:43<47:23, 74.83s/it]Evaluating egoproactive:  58%|█████▊    | 51/88 [1:21:00<46:31, 75.46s/it]Evaluating egoproactive:  59%|█████▉    | 52/88 [1:23:27<58:09, 96.94s/it]Evaluating egoproactive:  60%|██████    | 53/88 [1:27:56<1:26:41, 148.60s/it]Evaluating egoproactive:  61%|██████▏   | 54/88 [1:29:08<1:11:08, 125.56s/it]Evaluating egoproactive:  62%|██████▎   | 55/88 [1:31:12<1:08:49, 125.14s/it]Evaluating egoproactive:  64%|██████▎   | 56/88 [1:32:08<55:39, 104.34s/it]  Evaluating egoproactive:  65%|██████▍   | 57/88 [1:32:42<43:03, 83.34s/it] Evaluating egoproactive:  66%|██████▌   | 58/88 [1:34:05<41:37, 83.26s/it]Evaluating egoproactive:  67%|██████▋   | 59/88 [1:35:58<44:27, 92.00s/it]Evaluating egoproactive:  68%|██████▊   | 60/88 [1:38:14<49:10, 105.38s/it]Evaluating egoproactive:  69%|██████▉   | 61/88 [1:39:25<42:42, 94.90s/it] Evaluating egoproactive:  70%|███████   | 62/88 [1:40:24<36:25, 84.07s/it]Evaluating egoproactive:  72%|███████▏  | 63/88 [1:42:18<38:49, 93.18s/it]Evaluating egoproactive:  73%|███████▎  | 64/88 [1:43:36<35:25, 88.57s/it]Evaluating egoproactive:  74%|███████▍  | 65/88 [1:47:35<51:13, 133.62s/it]Evaluating egoproactive:  75%|███████▌  | 66/88 [1:48:29<40:14, 109.74s/it]Evaluating egoproactive:  76%|███████▌  | 67/88 [1:49:57<36:09, 103.31s/it]Evaluating egoproactive:  77%|███████▋  | 68/88 [1:53:21<44:30, 133.54s/it]Evaluating egoproactive:  78%|███████▊  | 69/88 [1:55:38<42:39, 134.73s/it]Evaluating egoproactive:  80%|███████▉  | 70/88 [1:56:43<34:07, 113.77s/it]Evaluating egoproactive:  81%|████████  | 71/88 [1:58:38<32:21, 114.18s/it]Evaluating egoproactive:  82%|████████▏ | 72/88 [2:00:39<30:58, 116.13s/it]Evaluating egoproactive:  83%|████████▎ | 73/88 [2:01:44<25:12, 100.83s/it]Evaluating egoproactive:  84%|████████▍ | 74/88 [2:03:01<21:48, 93.46s/it] Evaluating egoproactive:  85%|████████▌ | 75/88 [2:03:45<17:03, 78.70s/it]Evaluating egoproactive:  86%|████████▋ | 76/88 [2:06:27<20:45, 103.75s/it]Evaluating egoproactive:  88%|████████▊ | 77/88 [2:07:27<16:37, 90.69s/it] Evaluating egoproactive:  89%|████████▊ | 78/88 [2:08:10<12:41, 76.18s/it]Evaluating egoproactive:  90%|████████▉ | 79/88 [2:09:13<10:51, 72.34s/it]Evaluating egoproactive:  91%|█████████ | 80/88 [2:09:34<07:36, 57.01s/it]Evaluating egoproactive:  92%|█████████▏| 81/88 [2:10:41<06:59, 59.93s/it]Evaluating egoproactive:  93%|█████████▎| 82/88 [2:11:33<05:45, 57.56s/it]Evaluating egoproactive:  94%|█████████▍| 83/88 [2:13:36<06:25, 77.13s/it]Evaluating egoproactive:  95%|█████████▌| 84/88 [2:15:17<05:37, 84.41s/it]Evaluating egoproactive:  97%|█████████▋| 85/88 [2:16:45<04:15, 85.32s/it]Evaluating egoproactive:  98%|█████████▊| 86/88 [2:18:00<02:44, 82.29s/it]Evaluating egoproactive:  99%|█████████▉| 87/88 [2:18:45<01:11, 71.04s/it]Evaluating egoproactive: 100%|██████████| 88/88 [2:20:35<00:00, 82.73s/it]Evaluating egoproactive: 100%|██████████| 88/88 [2:20:35<00:00, 95.85s/it]
+2b640c18d4231b9b.mp4: interval_acc=0.5000 (10 intervals)
+5ffb0890d41b657b.mp4: interval_acc=0.4000 (10 intervals)
+9d573b5e8e238353.mp4: interval_acc=0.5455 (22 intervals)
+2590c2cacdf4a6c2.mp4: interval_acc=0.6875 (16 intervals)
+543fa79dc714ad88.mp4: interval_acc=0.4167 (12 intervals)
+554e251921df992c.mp4: interval_acc=0.5556 (18 intervals)
+a74dd55533702e91.mp4: interval_acc=0.5625 (16 intervals)
+ddd45588155515b7.mp4: interval_acc=0.4500 (20 intervals)
+01cf3744ff905bae.mp4: interval_acc=0.6000 (15 intervals)
+7f1c64f7d0880938.mp4: interval_acc=0.7500 (8 intervals)
+908edba416baccfe.mp4: interval_acc=0.5714 (14 intervals)
+26694a16b3f352ec.mp4: interval_acc=0.7000 (10 intervals)
+d1b4bd88ef655ac6.mp4: interval_acc=0.5000 (6 intervals)
+875bff219f6b77f2.mp4: interval_acc=0.5000 (10 intervals)
+714405de0f91efad.mp4: interval_acc=0.5833 (12 intervals)
+289f6d9790c6b736.mp4: interval_acc=0.5000 (16 intervals)
+8b21e98023cef25d.mp4: interval_acc=0.4167 (12 intervals)
+e3b63c11a7c9e0ab.mp4: interval_acc=0.4167 (12 intervals)
+42273b360ba21855.mp4: interval_acc=0.4091 (22 intervals)
+fe5d7b7ab2766027.mp4: interval_acc=0.5714 (14 intervals)
+54f4e41e303817e5.mp4: interval_acc=0.6000 (20 intervals)
+775d3390a64cc86d.mp4: interval_acc=0.5000 (12 intervals)
+35fd504c73586f05.mp4: interval_acc=0.6923 (13 intervals)
+fddac0c9fb6bfb7f.mp4: interval_acc=0.6111 (18 intervals)
+602e41ccaf4ecce2.mp4: interval_acc=0.6667 (12 intervals)
+9ec55705360d7c74.mp4: interval_acc=0.4286 (14 intervals)
+94fa143ee6c3130e.mp4: interval_acc=0.5789 (19 intervals)
+bdb7d6080b6193a3.mp4: interval_acc=0.6667 (12 intervals)
+24d95d2a6c9ceb33.mp4: interval_acc=0.3125 (16 intervals)
+f735773bc0459bad.mp4: interval_acc=0.4286 (14 intervals)
+9143595052d09321.mp4: interval_acc=0.6000 (20 intervals)
+c8de43fef9d332e1.mp4: interval_acc=0.5000 (12 intervals)
+62189b4f6359392b.mp4: interval_acc=0.7000 (10 intervals)
+eb59a469b3ac920b.mp4: interval_acc=0.2500 (12 intervals)
+0110d219eac267c0.mp4: interval_acc=0.3750 (16 intervals)
+f9ab736efee50387.mp4: interval_acc=0.8333 (12 intervals)
+f9b5eb74827728c3.mp4: interval_acc=0.7500 (8 intervals)
+c9e61ec88eb330ff.mp4: interval_acc=0.7273 (11 intervals)
+0028bee556249cd3.mp4: interval_acc=0.7000 (10 intervals)
+0529003148c61a83.mp4: interval_acc=0.6250 (24 intervals)
+d25d5ab77de65773.mp4: interval_acc=0.6111 (18 intervals)
+4031482e3291f02b.mp4: interval_acc=0.5909 (22 intervals)
+4e45aa0b7b1cefbc.mp4: interval_acc=0.6154 (13 intervals)
+7703e102d97f1b92.mp4: interval_acc=0.5000 (14 intervals)
+30550355d5d91039.mp4: interval_acc=0.6000 (10 intervals)
+58bc4ccb89389909.mp4: interval_acc=0.7222 (18 intervals)
+01e536365b8b57ad.mp4: interval_acc=0.7143 (14 intervals)
+e154915e636fc23f.mp4: interval_acc=0.6250 (16 intervals)
+0503dacc3da23d1a.mp4: interval_acc=0.2857 (7 intervals)
+c271543bd097924a.mp4: interval_acc=0.6667 (12 intervals)
+e084bf26fa7a042a.mp4: interval_acc=0.5000 (12 intervals)
+7027b1afa92cf9ad.mp4: interval_acc=0.5000 (20 intervals)
+5cb8fe5e3e60a647.mp4: interval_acc=0.5385 (26 intervals)
+932ea5bd09bba1c7.mp4: interval_acc=0.5000 (10 intervals)
+4fc1922db3df47c4.mp4: interval_acc=0.6250 (16 intervals)
+a0b2c24f4d3ff00d.mp4: interval_acc=0.5833 (12 intervals)
+f4b2e6ba35043fc6.mp4: interval_acc=0.5000 (6 intervals)
+4e8172fc12e887be.mp4: interval_acc=0.4286 (14 intervals)
+957b1133a062901f.mp4: interval_acc=0.6250 (16 intervals)
+b27e74ddecbb7bec.mp4: interval_acc=0.3333 (18 intervals)
+bf0dd175609a707f.mp4: interval_acc=0.5714 (14 intervals)
+0e2fa501411d8a34.mp4: interval_acc=0.5833 (12 intervals)
+ff51366018f42337.mp4: interval_acc=0.5000 (16 intervals)
+b980e0b5d0af2cad.mp4: interval_acc=0.5000 (12 intervals)
+113b52b758726ddb.mp4: interval_acc=0.5769 (26 intervals)
+b754e83170d633b2.mp4: interval_acc=0.7000 (10 intervals)
+c790d8940fe22f47.mp4: interval_acc=0.5714 (14 intervals)
+00735eddaeaaff4a.mp4: interval_acc=0.5909 (22 intervals)
+57d901c4644ef3d8.mp4: interval_acc=0.6000 (20 intervals)
+e99143d14531b854.mp4: interval_acc=0.8000 (10 intervals)
+7d641f52d47eaf74.mp4: interval_acc=0.5625 (16 intervals)
+f1736950dc5f4341.mp4: interval_acc=0.5000 (18 intervals)
+5fdcf288e74afb70.mp4: interval_acc=0.5833 (12 intervals)
+94b36e37606e3561.mp4: interval_acc=0.6667 (12 intervals)
+925b69d15de7ec31.mp4: interval_acc=0.5000 (10 intervals)
+63dbf9f85a9248ae.mp4: interval_acc=0.5000 (20 intervals)
+fc410db25e770e55.mp4: interval_acc=0.5833 (12 intervals)
+7fb4f4e1d88b7b18.mp4: interval_acc=0.6250 (8 intervals)
+7021c4bd1646e15c.mp4: interval_acc=0.5833 (12 intervals)
+ed2b9c89c8343f30.mp4: interval_acc=0.6000 (5 intervals)
+76f253f9f9ac70a9.mp4: interval_acc=0.6154 (13 intervals)
+d62c911f2a047ae2.mp4: interval_acc=0.8000 (10 intervals)
+7cfc874baa34cc4d.mp4: interval_acc=0.5625 (16 intervals)
+71da88e7ebab3c49.mp4: interval_acc=0.3571 (14 intervals)
+3368b9264beab478.mp4: interval_acc=0.6667 (15 intervals)
+01525b14f51cc663.mp4: interval_acc=0.6667 (12 intervals)
+76f6a9c88251a6e7.mp4: interval_acc=0.8000 (10 intervals)
+6d839f832037b10b.mp4: interval_acc=0.5714 (14 intervals)
+
+== Overall Metrics ==
+intervals: 1239
+accuracy : 0.5634
+confusion: {'gt_interrupt_pred_interrupt': 342, 'gt_interrupt_pred_silent': 335, 'gt_silent_pred_interrupt': 206, 'gt_silent_pred_silent': 356}
+interrupt: precision=0.6241 recall=0.5052 f1=0.5584
+silent   : precision=0.5152 recall=0.6335 f1=0.5682
+
+Saved predictions to /home/quewenjun/workspace/proactive_vlm/LiveStar/evaluate/output/egoproactive_sved_sample350_fpi4_ctxi20_f80_hist20_majority1_shards/shard_03_output.jsonl
