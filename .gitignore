@@ -11,3 +11,4 @@ inference/*.safetensors
 # Runtime / download artifacts
 inference/examples/
 inference/.cache/
+output/
